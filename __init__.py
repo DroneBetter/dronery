@@ -2,93 +2,19 @@ from sys import setrecursionlimit
 setrecursionlimit(1<<16)
 
 
-from matrix_unraveller import unraveller,strucget,strucset,structrans,enmax
-from dronery.ntt import cyclicConvolve
+from matrix_unraveller import strucget,strucset,structrans,enmax,localised
 from dronery.common import*
-
 from operator import __add__,__neg__,__sub__,__mul__,__floordiv__,__truediv__,__eq__,__or__,__gt__
+from dronery.ntt import fixlen
+import dronery.ntt
+from dronery.surd import*
+from dronery.matrix import*
+from dronery.poly import*
+from dronery.linRecur import*
+from dronery.perms import permutation
 
-def stractorise(struc,inds): #structure factorise
-    global diff
-    (g,gg)=(lambda g: (g,g[inds[-1]]))(strucget(struc,inds[:-1]))
-    if type(gg)==int and gg!=1 and len(g)==inds[-2]+1 or type(g[inds[-2]+1])==int:
-        diff=True
-        struc=strucset(struc,inds,[gg,list(factorise(gg))[1:-1]])
-    return(struc,inds)
-primate=(lambda n: () if n==1 else tuple(filter(lambda p: p[1],map(lambda p: (p,shortduce(lambda i: (i[0],False) if i[1]%p else ((i[0]+1,i[1]//p),True),i=(0,n))),reduce(lambda t,i: t+(i,)*all(map(lambda p: i%p,t)),range(2,n),())))) or ((n,1),))
-class surd:
-    __repr__=(lambda a,fn=True,name=False,tabular=False: name*'surd('+bool(a.i)*('e**(i*pi*'+str(frac(2*a.i,a[0][1]))+')*')+''.join(starmap(lambda i,a: ('-' if sgn(a[0][0])==-1 else '+' if i else tabular*' ')+(lambda f: f if a[1]==1 else ('sqrt' if a[1]==2 else 'cbrt')+'('+f+')' if fn and 2<=a[1]<4 else ('('+f+')' if a[0][1]!=1 else f)+'**(1/'+str(a[1])+')')(str(abs(a[0][0]))+('/'+str(a[0][1]))*(a[0][1]!=1)),enumerate(a.internal)))+')'*(name+bool(a.i)))
-    __iter__=(lambda a: iter(a.internal))
-    __getitem__=lambda a,i: a.internal[i]
-    def simplify(a):
-        while True:
-            ones=[]
-            for i,(b,e) in enumerate(a.internal):
-                g=gcd(*b)
-                if g!=1:
-                    a.internal[i][0]=[b[0]//g,b[1]//g]
-            cont=False
-            for i,(b,e) in enumerate(a.internal):
-                for j,(c,f) in enumerate(a[i+1:],start=i+1):
-                    if e==f and b[1]==c[1]:
-                        if b[0]==-c[0]:
-                            del(a.internal[j]);del(a.internal[i]);cont=True;break
-                        elif b[0]==c[0]:
-                            a.internal[i]=[[b[0]*2**e,b[1]],e];del(a.internal[j]);cont=True;break
-                if cont:
-                    break
-                elif b[0]:
-                    n=[b,e]
-                    for f,x in primate(e):
-                        for p in range(x+1):
-                            if any(map(lambda b: b!=sgn(b)*abs(inthroot(b,f**p)**f**p),b)):
-                                p-=1
-                                break
-                        if p:
-                            n=[lap(lambda b: inthroot(b,f**p),n[0]),n[1]//f**p]
-                            cont=True
-                    a.internal[i]=n
-                    if cont:
-                        break
-                    if e==1:
-                        ones.append(i)
-                else:
-                    del(a.internal[i])
-            if len(ones)>1:
-                frac=[0,1]
-                for i in ones[::-1]:
-                    frac=(lambda n,d: (lambda l: [frac[0]*l//frac[1]+n*l//d,l])(lcm(frac[1],d)))(*a[i][0])
-                    del(a.internal[i])
-                a.internal.append([frac,1])
-            elif not cont:
-                break
-        a.internal.sort()
-        if not a.internal:
-            a.internal=[[[0,1],1]]
-        if len(a)==1 and a[0][1]==2 and a.i==1:
-            a.internal[0][0][0]*=-1
-            a.i=0
-        return(a.internal)
-    __eq__=(lambda a,b: a.internal==b.internal)
-    __add__=(lambda a,b: surd(a.internal+b.internal) if type(b)==surd else a+surd(b))
-    __radd__=__add__
-    __neg__=(lambda a: surd(lap(lambda a: [[-a[0][0],a[0][1]],a[1]],a.internal)))
-    __sub__=(lambda a,b: a+-b)
-    __rsub__=(lambda a,b: -a+b)
-    __mul__=(lambda a,b: surd(map(lambda a: [[a[0][0]*b,a[0][1]],a[1]],a)) if type(b)==int else surd([(lambda l: [[sgn(n)*sgn(m)*abs(n**(l//e)*m**(l//f)),d**(l//e)*c**(l//f)],l])(lcm(e,f)) for ((n,d),e),((m,c),f) in product(a,b)]))
-    __rmul__=__mul__
-    __pow__=lambda a,n: surd(map(lambda r: (lambda l: [reduce(lambda a,b: [a[0]*b[0],a[1]*b[1]],starmap(lambda f,e: lap((l//e).__rpow__,f),r)),l])(lcm(*map(lambda r: r[1],r))),product(a.internal,repeat=n)) if n>0 else ([[[a[0][0][1],a[0][0][0]],a[0][1]]] if len(a)==1 else invquad(a.internal) if a.quadratic() else NotImplementedError) if n else 1)
-    __len__=lambda a: len(a.internal)
-    quadratic=lambda a: len(a)==2 and sorted((a[0][1],a[1][1]))==[1,2] or len(a)==1 and a[0][1]<=2
-    __truediv__=(lambda a,b: surd(map(lambda t: [[t[0][0],t[0][1]*b],t[1]],a)) if type(b)==int else surd(lap(lambda t: [[t[0][0]**((l:=lcm(t[1],b[0][1]))//t[1])*b[0][0][0]**(l//b[0][1]),t[0][1]**(l//t[1])*b[0][0][1]**(l//b[0][1])],l],a)) if type(b)==surd and len(b)==1 else a*invquad(b.internal) if type(b)==surd and b.quadratic() else TypeError('wibble'))
-    __float__=(lambda a: float(sum(map(lambda b: sgn(b[0][0])*(abs(b[0][0])/b[0][1])**(1/b[1]),a)))*(-1)**nicediv(2*a.i,a[0][1]))
-    __bool__=(lambda a: any(map(lambda a: a[0][0],a)))
-    __gt__=(lambda a,b: float(a)>float(b))
-    def __init__(a,t,i=0):
-        a.i=i #for representing roots of unity
-        a.internal=[[[t,1],1]] if type(t)==int else [[[t.numerator,t.denominator],1]] if type(t)==frac else list(t)
-        a.simplify()
-invquad=lambda a: (lambda a,b: surd([[[a[0]*a[1]*b[1],a[0]**2*b[1]-a[1]**2*b[0]],1],[[a[1]**4*b[0]*b[1],(lambda x: sgn(x)*abs(x)**2)(a[1]**2*b[0]-a[0]**2*b[1])],2]]))(*map(rgetitem(0),sorted(a,key=rgetitem(1))))
+
+
 def continuedsqrt(n): #continued fraction
     s=isqrt(n)
     if n==s**2: return(([s],[]))
@@ -97,10 +23,12 @@ def continuedsqrt(n): #continued fraction
     Q=[1]
     while True:
         t.append((s+P[-1])//Q[-1])
-        P.append((P[-1]+s)//Q[-1]*Q[-1]-P[-1])
+        P.append(t[-1]*Q[-1]-P[-1])
         Q.append((n-P[-1]**2)//Q[-1])
         for i in range(len(P)-1):
-            if (P[i],Q[i])==(P[-1],Q[-1]): return((t[:i],t[i:])) #period len(t)-i
+            if (P[i],Q[i])==(P[-1],Q[-1]): return (t[:i],t[i:]) #period len(t)-i
+continued=lambda n,l,threshold=1<<10: shortduce(lambda r,i: (r[:-1]+(int(r[-1]),(m:=r[-1]%1) and 1/m),m and (not threshold or r[-1]<threshold)),range(l),(n,))[:-1]
+uncontinued=lambda n,l=-1: (lambda n: n and 1/n)(reduce(lambda r,i: (r or i) and 1/(i+r),n[::-1],frac(0)))
 
 surprisal=lambda p: -(1-p)*log(1-p,2)-p*log(p,2)
 def eratosthenes(limit):
@@ -112,17 +40,17 @@ def eratosthenes(limit):
     return [2]+list(filter(prime.__getitem__,range(3,limit,2)))
 
 def atkin(limit,mapping=False):
-    sqrt_end=isqrt(limit)+2
+    sqrtlim=isqrt(limit)+2
     prime=[False]*limit
-    for x in range(2,sqrt_end+1,2):
+    for x in range(2,sqrtlim+1,2):
         xx=x**2
-        for y in range(1,sqrt_end,2):
+        for y in range(1,sqrtlim,2):
             n=xx+y**2
             if n>=limit: break
             if not 1!=n%12!=5: prime[n]^=True
     for x in range(1,isqrt(limit//3)+2,2):
         xx3=3*x**2
-        for y in range(2,sqrt_end,2):
+        for y in range(2,sqrtlim,2):
             n=xx3+y**2
             if n>=limit: break
             if n%12==7: prime[n]^=True
@@ -132,31 +60,11 @@ def atkin(limit,mapping=False):
             n=xx3-y**2
             if n>=limit: break
             if n%12==11: prime[n]^=True
-    for x in range(5,sqrt_end):
+    for x in range(5,sqrtlim):
         if prime[x]:
             for y in range(x*x,limit,x*x): prime[y]=False
     return([False]*2+[True]*2+[False]+prime[5:] if mapping else [2,3]+list(filter(prime.__getitem__,range(5,limit,2))))
 
-try:
-    from sympy import divisors as symvisors,factorint,primefactors
-    factorise=lambda n,primes=False: polyprod(n) if type(n)==polynomial else tuple(factorint(n).items()) if primes else tuple(divisors(n)[1:]) #tuple(factorint(m).keys())+(m,)
-    divisors=lambda n: tuple(symvisors(n)) if type(n)==int else tap(lambda d: frac(d,n.denominator),symvisors(n.numerator)) if type(n)==frac else ValueError(str(n)+' is not integer or fraction')
-    phi=totient=lambda n: prod(starmap(lambda p,e: (p-1)*p**(e-1),factorint(n).items()))
-except:
-    #factorise=lambda n: tuple(filter(lambda k: not n%k,range(1,n//2+1)))+(n,)
-    factorise=lambda n: polyprod(n) if type(n)==polynomial else (lambda f: f+tap(lambda f: n//f,reversed(f[:-1] if isqrt(n)**2==n else f)))(tuple(filter(lambda a: not(n%a),range(1,isqrt(n)+1)))) #terrible but sufficient for time being (not reinventing the wheel of Atkin)
-
-from sympy import primerange
-moddiv=(lambda a,b: divmod(a,b)[::-1])
-from numbers import Number
-sgn=(lambda n,zerositive=False: n and (-1)**(n<0) or zerositive if isinstance(n,Number) else (lambda m: type(n)(tap(m.__rtruediv__,n)) if 0!=m!=1 else n)(hypot(*n)))
-
-
-if isqrtSequences:=True:
-    A002024=(lambda n: isqrt(n<<3)+1>>1)
-    A002260=(lambda n,b=False: (lambda s: (lambda o: (o,s-o) if b==2 else (o,s) if b else o)(n-s*(s-1)//2))(A002024(n))) #1-indexed antidiagonal coordinates
-    A003056=(lambda n: isqrt(n<<3|1)-1>>1)
-    A002262=trinv=(lambda n,b=False: (lambda s: (lambda o: (o,s-o) if b==2 else (o,s) if b else o)(n-s*(s+1)//2))(A003056(n))) #0-indexed antidiagonal coordinates
 
 def A176774(n):
     for k in revange(A003056(n)+1):
@@ -178,11 +86,11 @@ A002517=Y(lambda f: lambda n: 3*t.index(n) if any(map(n.__eq__,t:=tap(f,range(n)
 #lexinc=lambda n: (lambda t: t|((t&-t)//(n&-n)>>1)-1)((n|n-1)+1) #from Stanford bit-twiddling hacks
 lexinc=lambda n: n and (n^n+(u:=n&-n))//u>>2|n+u #from OEIS (A057168), which came from hakmem175 (minorly beats others) #note that |n+u could be +n+u equivalently
 
-bindex=lambda n: reduce(lambda m,i: (lambda s,m,i,b: (s+choose(i,m),m) if b else (s,m+1))(*m,*i),enumerate(decompose(n)),(0,-1))[0]
+'''bindex=lambda n: reduce(lambda m,i: (lambda s,m,i,b: (s+choose(i,m),m) if b else (s,m+1))(*m,*i),enumerate(decompose(n)),(0,-1))[0]
 bindex=lambda n: Y(lambda f: lambda s,m,i,n: f(*((s+choose(i,m),m) if n&1 else (s,m+1)),i+1,n>>1) if n else s)(0,-1,0,n)
 bindex=lambda n: reduce(lambda m,i: (lambda s,m,c,i,b: ((s+c,m,c*i//(i-m+1)) if b else (s,m+1,c*i//m)) if m else (s,1-b,c))(*m,*i),enumerate(decompose(n),1),(0,0,1))[0] #longer version but more efficient (without choose)
 bindex=lambda n: reduce(lambda m,i: (lambda s,m,c: ((s+c,m,c*(i+1)//(i-m+2)) if n>>i&1 else (s,m+1,c*(i+1)//m)) if m else (s,~n>>i&1,c))(*m),range(n.bit_length()),(0,0,1))[0]
-bindex=lambda n: Y(lambda f: lambda s,m,c,i,n: f(*(((s+c,m,c*i//(i+1-m)) if n&1 else (s,m+1,c*i//m)) if m else (s,~n&1,c)),i+1,n>>1) if n else s)(0,0,1,1,n)
+bindex=lambda n: Y(lambda f: lambda s,m,c,i,n: f(*(((s+c,m,c*i//(i+1-m)) if n&1 else (s,m+1,c*i//m)) if m else (s,~n&1,c)),i+1,n>>1) if n else s)(0,0,1,1,n)'''
 bindex=lambda n: Y(lambda f: lambda s,m,c,i,n: f(*((s+c,m,c*i//(i+1-m)) if n&1 else (s,m+1,c*i//m)),i+1,n>>1) if n else s)(0,1,1,(v:=val2(n+1))+1,n>>v)
 
 binget=lambda w,i: construce(lambda o,m,i,n: (o<<1,m,i) if i<choose(n,m) else (o<<1|1,m-1,i-choose(n,m)),revange(firstchoose(w,i)),(0,w,i))[0]
@@ -195,8 +103,10 @@ class lexbin:
     index=lambda l,i: bindex(i)
     getter=lambda l,i: construce(lambda o,m,i,n: (o<<1,m,i) if i<choose(n,m) else (o<<1|1,m-1,i-choose(n,m)),revange(firstchoose(l.m,i)),(0,l.m,i))[0]
     __getitem__=lambda l,i: expumulate(lexinc,i.stop+~(i.start or 0))(l.getter(i.start or 0)) if type(i)==slice else l.getter(i)
-    __iter__=lambda l: expumulate(lexinc,choose(l.n,l.m)-1)((1<<l.m)-1)
+    __iter__=lambda l: expumulate(lexinc,choose(l.n,l.m)-1)(~(~0<<l.m))
 
+
+ceil=lambda x: int(x)+(x>int(x))
 ceilsqrt=lambda n: n and isqrt(n-1)+1 #lambda x: (lambda s: s+(s**2<x))(isqrt(x))
 class hexer:
     def __init__(h,r):
@@ -227,700 +137,62 @@ class hexer:
 #print(tap(lambda n: (lambda n,k: lexbin(n+1)[k])(*A002262(n,2)),range(16))) #A067576
 
 from sympy import integer_nthroot
-inthroot=(lambda b,n: sgn(b)*(isqrt(abs(b)) if n==2 else integer_nthroot(abs(b),n)[0]))
+inthroot=lambda n,p: n and sgn(n)*(integer_nthroot(abs(n),p)[0] if p&p-1 else funcxp(isqrt,p.bit_length()-1)(abs(n)))
 icbrt=lambda n: inthroot(n,3)
-itsrt=lambda n: inthroot(n,4)
+itsrt=lambda n: isqrt(sqrt(n)) #faster than inthroot(n,4)
 mootroot=(lambda b,n: (lambda i: (b%i**n,i))(inthroot(b,n))) #like moddiv (I think it will catch on)
 willian=lambda n: 1+sum(map(lambda i: (lambda r: r>0 and integer_nthroot(r,n)[0])(n//int(sum(map(lambda j: not((fact(j-1)+1)%j),range(1,i+1))))),range(1,2**n+1))) #willian(0)=1 (very suspicious)
 jones=lambda n: sum(map(lambda i: sum(map(lambda j: pow(fact(j),2,j+1),range(i)))<n,range(n*n.bit_length()+1))) #jones(0)=0 (what did Jones mean by this)
 
-stratrix=lambda m,dims=None,strict=True,keepzero=False: (lambda dims: (lambda m: '\n'.join((lambda s: (lambda c: starmap(lambda i,r: (' ' if i else '(')+(','+'\n'*(dims==3)).join(starmap(lambda i,s: ' '*(c[i]-len(s))+s,enumerate(r[:len(c)])))+(',' if len(m)+~i else ')'),enumerate(s)))(tap(lambda c: max(map(len,c)),zip_longest(*s,fillvalue=''))))(tap(taph(lambda f: stratrix(f,2,strict) if dims==3 else str(f) if f or keepzero else ' '),m))))(tap(tuple,m) if dims==2 else Y(lambda f: lambda i: lambda m: tap(f(i-1),m) if i else m)(dims)((m,))))(Y(lambda f: lambda m,i: f(m[0],i+1) if isinstance(m,Iterable) else i)(m,0) if dims==None else dims)
 
-#matmul=lambda a,b: map(lambda a: map(lambda b: dot(a,b),transpose(b)),a)
-matmul=lambda a,b: tap(tuple,batched(starmap(dot,product(a,transpose(b))),len(b[0])))
+modpolypow=lambda p,n,m: squow(p,n,lambda a,b: a*b%m)
 
-nicediv=lambda a,b,frac=False: a/b if type(a) in (s:={float,surd}) or type(b) in s else ((Fraction if frac else __truediv__) if a%b else __floordiv__)(a,b) #remain integer if possible
-inverse=lambda m,f=True: tap(lambda i: i[len(i)>>1:],reduce(lambda m,i: larmap(lambda j,c: tap(lambda e,d: d-nicediv((c[i]-(j==i))*e,m[i][i],f),m[i],c),enumerate(m:=m if m[i][i] else exchange(m,i,next(filter(m[i].__getitem__,range(i)))))),revange(len(m)),m:=reduce(lambda r,i: r if r[i][i] else exchange(r,i,Y(lambda f: lambda j: j if r[j][i] else f(j+1))(0)),revange(len(m)),larmap(lambda i,r: r+i*(0,)+(1,)+(len(m)+~i)*(0,),enumerate(m))))) #Gauss-Jordan elimination
-
-factdet=lambda m: sum(map(lambda p: (-1)**permutation(p).parity()*prod(map(lambda i: m[i][p[i]],range(len(m)))),permutations(range(len(m))))) #O(n!)
-
-lapcxept=lambda f,l,i: lap(f,l[:i])+[l[i]]+lap(f,l[i+1:])
-def adj(m,mode=0): #adjugate #equivalent to Bareiss's algorithm for matrices of integers
-    ints=all(map(compose(maph(lambda n: type(n)==int),all),m))
-    det=a=b=1
-    aug=larmap(lambda i,r: list(r)+[0]*i+[1]+[0]*(len(m)+~i),enumerate(m))
-    for c in range(len(m)):
-        if not aug[c][c]: exchange(aug,c,next(filter(lambda i: aug[i][c],range(c+1,len(m)))));det*=-1
-        a,b=aug[c][c],a
-        aug=lapcxept(lambda row: larmap(lambda x,y: (frac,int.__floordiv__)[ints](a*x-row[c]*y,b),zip(row,aug[c])),aug,c)
-    det*=a
-    adj=lap(lambda r: r[len(m):],aug)
-    return (det,adj) if mode==2 else det if mode else adj
-adjdet=lambda m: adj(m,1)
-
-def lu(m):
-    m=lap(list,m)
-    p=list(range(len(m)))
-    for i in range(len(m)): exchange(m,i,j:=max(range(i,len(m)),key=lambda j: abs(m[j][i])));exchange(p,i,j) #abs() for numerical stability purposes, but abs(sgn()) is okay for fractions
-    l=lap(lambda i: [0]*i+[1]+[0]*(len(m)+~i),range(len(m)))
-    u=lap(lambda i: [0]*len(m),range(len(m)))
-    dotto=lambda i,j,k: sum(map(lambda k: u[k][j]*l[i][k],range(k)))
-    for i in range(len(m)):
-        for j in range(i): l[i][j]=frac(m[i][j]-dotto(i,j,j),u[j][j])
-        u[i][i:]=lap(lambda j: m[i][j]-dotto(i,j,i),range(i,len(m)))
-    return(lap(lambda i: [0]*i+[1]+[0]*(len(m)+~i),permutation(p).inverse()),l,u)
-ludet=lambda m: prod(starmap(lambda i,r: r[i],enumerate(lu(m)[2])))
-
-det=lambda m: adjdet(m) if all(map(compose(maph(lambda n: type(n)==int),all),m)) else ludet(m)
-
-"""from time import time
-v=8;adt=[];ldt=[]
-for l in range(16,32):
-    m=tap(lambda y: tap(lambda x: frac(randrange(-v,v+1),3),range(l)),range(l))
-    '''while l>5 or factdet(l)!=0:
-        m=tap(lambda y: tap(lambda x: randrange(-v,v+1),range(l)),range(l))'''
-    t=time()
-    ad=adjdet(m);adt.append(-t+(t:=time()))
-    ld=ludet(m);ldt.append(time()-t)
-    print(l,adt[-1],ldt[-1],adt[-1]/ldt[-1],ad,ld)
-    print(m==reduce(matmul,lu(m)))""" #conclusions: adj is approximately 2* faster than lu for integer-valued matrices but 10* slower for fraction-valued ones
-
-characteristic=lambda m: polynomial(Y(lambda f: lambda t,a: t if len(t)>len(m) else f((n:=frac(-sum(map(lambda i: a[i][i],range(len(m)))),len(t)),)+t,matmul(m,tap(taph(__add__),a,tap(lambda i: i*(0,)+(n,)+(len(m)+~i)*(0,),range(len(m)))))))((1,),deepcopy(m))) #Faddeev-LeVerrier algorithm (my beloved)
-eigenvalues=lambda m: tuple(chap(roots,linearFactors(characteristic(m))))
-eigenvectors=lambda m: tap(lambda v: (lambda t: (lambda x,y: (lambda q: q[:x]+((1,),)+q[x:])(matmul(inverse(tap(lambda t: t[:x]+t[x+1:],t[:y]+t[y+1:])),tap(lambda t: (-t[x],),t[:y]+t[y+1:]))))(*next(stilter(lambda x,y: any(map(lambda t: t[x] and any(t[:x]+t[x+1:]),t[:y]+t[y+1:])),product(range(len(t)),repeat=2)))))(tarmap(lambda i,r: r[:i]+(r[i]-v,)+r[i+1:],enumerate(m))),eigenvalues(m))
-#eigenvectors=lambda A,eigenvalues: tap(lambda k: tap(lambda i: prod(map(values[i].__sub__,eigenvalues(tap(lambda t: t[:k]+t[k+1:],A[:k]+A[k+1:]))))/prod(map(values[i].__sub__,values[:i]+values[i+1:])),range(len(A))),range(len(A))) #very elegant form from https://terrytao.wordpress.com/2019/08/13/eigenvectors-from-eigenvalues (however only supporting Hermitians)
-
-#squow=Y(lambda f: lambda m,n: m**(n&1)*f(m**2,n>>1) if n else 1)
-#squow=lambda m,n: reduce(lambda r,i: (r[0]**2,r[1]*r[0]**(n>>i&1)),range(n.bit_length()),(m,1))[1]
-squow=lambda m,n,mul=__mul__,id=1: reduce(lambda r,i: (mul(r[0],r[0]),mul(r[1],r[0]) if n>>i&1 else r[1]),range(n.bit_length()),(m,id))[1] #pow by squaring
-matpow=lambda m,n: squow(inverse(m) if n<0 else m,abs(n),matmul,tap(lambda i: (0,)*i+(1,)+(0,)*(len(m)+~i),range(len(m))))
-
-roots=lambda *a,frac=True,complalways=False,quadsurd=True: (lambda a,b=0,c=0,d=0,e=0: #complalways will return complexes with +0j's for uniformity
- (lambda wi,wo: (lambda di,do: tuple(chap(lambda i: (lambda ir: map(lambda j: (-1)**i*do/2+(-1)**j*ir/2-b/(4*a),range(2)))(sqrt((b/a)**2/2+(-1)**i*(4*b*c/a**2-8*d/a-(b/a)**3)/(4*do)-di-(wo*a*wi+4*c/a)/3)),range(2))))(wi/(3*cbrt(2)*a),sqrt((b/a)**2/4+di+wo/3*a*wi-2*c/(3*a))))(cbrt((lambda d: sqrt(d**2-4*(12*a*e-3*b*d+c**2)**3)+d)(-72*a*c*e+27*a*d**2+27*b**2*e-9*b*c*d+2*c**3)),cbrt(2)*(12*a*e-3*b*d+c**2))
-if e else
- (lambda cb: tap(lambda i: (lambda co: (co/2*cb+co.conjugate()*(3*a*c-b**2)/(2*cb)-b)/(3*a))(sqrt(3)*1j*(-1)**i-1 if i else 2),range(3)))(cbrt((sqrt((9*a*b*c-27*a**2*d-2*b**3)**2+4*(3*a*c-b**2)**3)-27*a**2*d+9*a*b*c-2*b**3)/2))
-if d else
- (quadroots(tap(int,(c,b,a))) if quadsurd else (lambda sq: tap(lambda e: ((-1)**e*sq-b)/(2*a),range(2)))((lambda d: sqrt(abs(d))*(1j**(d<0) if complalways else 1j if d<0 else 1))(b**2-4*a*c)))
-if c else
- (-b/a,)
-if b else
- ValueError('that is not how degree-0 polynomials work'))(*(funcxp(taph(frac),frac))(a[0][::-1] if len(a)==1 and type(a[0]) in {polynomial,tuple} else a[::-1])) #I was going to include an f but this program is too small to contain it
-quadroots=lambda p: tap(lambda e: surd([[[-p[1],2*p[2]],1],[[(-1)**e*(p[1]**2-4*p[2]*p[0]),4*p[2]**2],2]]),range(2)) #surd class may only be used for quadroots, I don't think others can be unnested radicals
-
-def A000793(n,o=True): #highest lcm of integers summing to n
-    V=lap(lambda _: 1,range(n+1))
-    for i in primerange(n+1):
-        for j in range(n,i-1,-1):
-            '''hi=V[j]
-            pp=i
-            while pp<=j:
-                hi=max((pp if j==pp else V[j-pp]*pp),hi)
-                pp*=i
-            V[j]=hi'''
-            V[j]=reduce(lambda a,_: (max(a[0],a[1] if j==a[1] else V[j-a[1]]*a[1]),a[1]*i),range(ilog(j,i)),(V[j],i))[0]
-        #V[i:n+1]=lap(lambda j: reduce(lambda a,_: (max(a[0],V[j-a[1]]*a[1]),a[1]*i),range(ilog(j-1,i)+1),(V[j],i))[0],range(i,n+1)) #cannot be done because they consider other values also
-    return(V[-1] if o else V)
-#print('\n'.join(map(str,enumerate(A000793(48,False)))))
-
-#A003418=(lambda n: reduce(lcm,range(1,n+1),1))
-A003418=(lambda n: prod(map(lambda p: p**ilog(n,p),primerange(n+1)))) #lcm of all length-n permutations' orders
-
-permute=lambda p,t: (lambda o: o+t[len(p):] if len(t)>len(p) else o)(tap(t.__getitem__,p)) #could also be done by the other convention, tap(t.index,p), by inverting them, but this is the faster convention when __getitem__ is O(1)
-class permutation:
-    __call__=lambda p,l: permute(p.internal,l)
-    __repr__=lambda p: 'permutation('+(','*(len(p)>9)).join(map(str,p.internal))+')'
-    __iter__=lambda p: iter(p.internal)#(lambda p: chain(iter(p.internal),count(len(p))))
-    __len__=lambda p: len(p.internal)
-    __getitem__=(lambda p,i: (p.internal+tuple(range(len(p.internal),i.stop)) if i.stop>len(p.internal) else p.internal[i]) if type(i)==slice else p.internal[i] if type(i)==int and i<len(p) else i) #lambda p,i: p.internal[dbg(i)] #islice(iter(p),i)
-    __add__=(lambda a,b: permutation(a.internal+tap(len(a).__add__,b.internal)))
-    inverse=(lambda p: permutation(map(p.index,range(len(p)))))
-    #__pow__=(lambda p,n: p.inverse() if n==-1 else reduce(lambda r,i: p*r,range(n-1),p) if n else range(len(p)))
-    #__pow__=(lambda p,n: (lambda n: p.inverse()**-n if n<0 else reduce(lambda r,i: p*r,range(n-1),p) if n else range(len(p)))(lambda o: ((lambda n: n-o*(n>o>>1))(n%o))(order(p))))
-    def __pow__(p,n): #any asymptotically faster than this would require factorising n to enact recursively, probably
-        c=p.cycles()
-        '''m=tap(lambda c: (lambda e: c[-e:]+c[:-e])(n%len(c)),c)
-        o=lap(lambda _: None,p) #do not multiply lists by integers (worst mistake of my life)
-        for c,m in zip(c,m):
-            for c,m in zip(c,m):
-                o[c]=m'''
-        o=lap(lambda _: None,p)
-        for c in c:
-            #for c,m in zip(c,(lambda e: c[-e:]+c[:-e])(n%len(c))):
-            for c,m in zip(c,(lambda e: c[e:]+c[:e])((lambda o: (lambda n: n-o*(n>o>>1))(n%o))(len(c)))): #very elegant I think
-                o[c]=m
-        return(permutation(o))
-    comp=(lambda a,b: (a,permutation(b.internal+tuple(range(len(a)-len(b))))) if len(a)>=len(b) else permutation.comp(b,a)[::-1])
-    __eq__=(lambda a,b: __eq__(*map(tuple,permutation.comp(a,b))))
-    __gt__=(lambda a,b: __gt__(*permutation.comp(a,b)))
-    __lt__=(lambda a,b: __lt__(*permutation.comp(a,b)))
-    __ge__=(lambda a,b: __ge__(*permutation.comp(a,b)))
-    __le__=(lambda a,b: __le__(*permutation.comp(a,b)))
-    __mul__=(lambda a,b: permutation(permute(a,b)))
-    __rmul__=__mul__
-    index=(lambda p,i: p.internal.index(i))
-    def __init__(p,t): #my feeling when it cannot be a lambda :-(
-        if isinstance(t,(map,filter)): t=tuple(t)
-        p.internal=reduce(lambda t,i: ((len(s)+~t[1].pop(i),)+t[0],t[1]),s:=shortduce(lambda t: (lambda m,d: (((m,)+t[0],d,t[2]+1),d))(*moddiv(t[1],t[2])),i=((),t,1))[0],((),list(range(len(s)))))[0] if type(t)==int else tuple(fromCycles(t) if isinstance(t[0],Iterable) else t)
-    #various other things
-    '''
-        __int__=(lambda p: sum(starmap(int.__mul__,enumerate(reversed(tuple(starmap(lambda i,t: t-sum(map(t.__gt__,p[:i])),enumerate(p)))),start=1))))
-        __int__=(lambda p: sum(starmap(int.__mul__,enumerate(starmap(lambda i,t: t-sum(map(t.__gt__,p[:i])),enumerate(p)),start=1))))
-        __int__=(lambda p: sum(map(int.__mul__,reversed(tuple(starmap(lambda i,t: t-sum(map(t.__gt__,p[:i])),enumerate(p)))),redumulate(int.__mul__,range(len(p)),1))))
-        __int__=(lambda p: sum(map(int.__mul__,starmap(lambda i,t: t-sum(map(t.__gt__,p[:i])),enumerate(dbg(p))),redumulate(int.__mul__,range(1,len(p))))))
-        __int__=(lambda p: sum(map(int.__mul__,reversed(tuple(starmap(lambda i,t: t-sum(map(t.__gt__,p[:i])),enumerate(dbg(p))))),redumulate(int.__mul__,range(1,len(p))))))
-        __int__=(lambda p: sum(map(int.__mul__,starmap(lambda i,t: t-sum(map(t.__gt__,p[:i])),enumerate(dbg(p))),redumulate(int.__floordiv__,range(len(p),2),fact(len(p)))))) #produces sequence of palindromes, (0,2,0,12,6,12,0,24,0,72,24,72,0,48,0,72,48,72,24,48,24,72,48,72,0,120,0,240,120,240,0) (very suspicious)
-        __int__=(lambda p: sum(map(int.__mul__,starmap(lambda i,t: t-sum(map(i.__gt__,map(p.index,range(i)))),enumerate(dbg(p))),redumulate(int.__floordiv__,range(len(p),2),fact(len(p)))))) #also palindromes
-        __int__=(lambda p: sum(map(int.__mul__,starmap(lambda i,t: t+~sum(map(i.__lt__,map(p.index,range(i)))),enumerate(dbg(p))),redumulate(int.__floordiv__,range(len(p),1),fact(len(p)))))) #very suspicious non-palindromic sequence of alternating sign
-        __int__=(lambda p: sum(map(int.__mul__,starmap(lambda i,t: t+1-sum(map(t.__gt__,p[i+1:])),enumerate(dbg(p))),redumulate(int.__floordiv__,range(len(p),2),fact(len(p)))))) #A048765
-        __int__=(lambda p: sum(map(int.__mul__,starmap(lambda i,t: t+1-sum(map(t.__gt__,p[:i])),enumerate(dbg(p))),redumulate(int.__floordiv__,range(len(p),2),fact(len(p)))))) #weird Thue-Morse-like thing
-        __int__=(lambda p: sum(map(int.__mul__,starmap(lambda i,t: t-sum(map(i.__lt__,map(p.index,range(i)))),enumerate(dbg(p))),redumulate(int.__floordiv__,range(len(p)-1,0,-1),fact(len(p)-1)))))'''
-    __int__=lambda p: reduce(lambda r,i: (r[0]+(len(p)+~(i[1]+sum(map(i[1].__lt__,r[1]))))*fact(len(p)+~i[0]),r[1]+(i[1],)),enumerate(p[:0:-1]),(0,()))[0]
-
-    def cycles(p,o=0): #(idea to use sets is from https://stackoverflow.com/a/75823973 :-)
-        #len(cycles)          if o==2 else
-        #(oscillatory period) if o==1 else
-        #(cycles themselves)
-        pi={i: p for i,p in enumerate(p[:len(p)])}
-        cycles=(o!=2 if o else [])
-        while pi:
-            nexter=pi[next(iter(pi))] #arbitrary starting element
-            cycle=(not(o) and [])
-            while nexter in pi:
-                if o: cycle+=1;curr=nexter;nexter=pi[nexter];del(pi[curr]) #a little bit of tessellation (very suspicious)
-                else: cycle.append(nexter);nexter=pi[nexter];del(pi[cycle[-1]])
-            if o==2: cycles+=1
-            elif o: cycles=lcm(cycles,cycle)
-            else: cycles.append(cycle) #inelegant (however I am not quite deranged enough for eval('cycles'+('+=1' if o==2 else '=lcm(cycles,cycle)' if o else '.append(cycle)')) :-)
-        return(cycles)
-    order=(lambda p: p.cycles(1))
-    maxder=(lambda p: A000793(len(p)))
-    modder=(lambda p: A003418(len(p))) #could be used instead of order, perhaps (depending)
-    #parity=(lambda p: reduce(int.__xor__,((a<b)&(B<A) for (a,A),(b,B) in product(enumerate(p),repeat=2)))) #very suspicious (from https://codegolf.stackexchange.com/questions/75841/75856)
-    #parity=(lambda p,b=None: reduce(lambda c,d: c^~len(d)&1,p.cycles(),0) if b==None else permutation.parity(tap(p.index,b))) #O(n*lg(n)) (lg due to hashtables) instead of O(n**2) #may be computing that of inverse but parity is irrespective
-    parity=(lambda p,b=None: (len(p)^p.cycles(2))&1 if b==None else permutation.parity(tap(p.index,b)))
-
-#fromCycles=lambda c: permutation(reduce(lambda r,i: r+(lambda t: t and (t[-1],)+t[:-1])(tuple(range(l:=r[-1]+1 if r else 0,l+i))),c,())) #for representatives
-fromCycles=lambda c: reduce(lambda p,c: reduce(lambda p,i: p[:i[0]]+(i[1],)+p[i[0]+1:],zip(c,chain(c[1:],(c[0],))),p),c,tuple(range(sum(map(len,c)))))
-
-signs=(lambda q,sur=True: tap(lambda n: reduce(lambda c,q: (c[0]+(q*(-1)**(n>>c[1]&1),),c[1]+1) if q else (c[0]+(surd(0) if sur else 0,),c[1]),q,((),0))[0],range(1<<len(tuple(filter(lambda x: x[1],enumerate(q)))))))
-eventations=(lambda v: tap(taph(v.__getitem__),filter(lambda p: not(permutation(p).parity()),permutations(range(len(v))))))
-signventations=(lambda v,t=None,e=False,sur=True: tap((vector3 if len(v)==3 else versor) if t==None else t,chap(lambda q: signs(q,sur=sur),(eventations if e else permutations)(v))))
-
-def floorctorial(n,i=False):
-    k=1;a=1
-    while a<n: k+=1;a*=k
-    return(k-(a>n) if i else a//k**(a>n))
-
-"""def ilog(n,b):
-    min,max=0,1
-    acc=b
-    while acc<=n:
-        acc**=2
-        min=max
-        max<<=1
-    '''if acc==n:
-        return(max)
-    else:''' #indent all thereafter
-    #if True:
-    change=min>>1
-    while change:
-        max=acc//b**change
-        if max<=n:
-            acc=max
-            min+=change
-        change>>=1
-    return(min)
-    '''else:
-        while max+~min:
-            mid=max+min>>1
-            if b**mid>n: max=mid
-            else: min=mid
-        return(min)'''""" #from OEIS, however I don't think bisection is more efficient when exponentiation takes time proportional to output length
-def ilog(n,b):
-    if b==1!=n:
-        raise(ValueError('base-1 logarithm does not work'))
-    else:
-        i=0
-        while n>1:
-            n//=b
-            i+=1
-        return(i-(not n))
-
-def A000793(n,o=True): #highest lcm of integers summing to n
-    V=lap(lambda _: 1,range(n+1))
-    for i in primerange(n+1):
-        for j in range(n,i-1,-1):
-            '''hi=V[j]
-            pp=i
-            while pp<=j:
-                hi=max((pp if j==pp else V[j-pp]*pp),hi)
-                pp*=i
-            V[j]=hi'''
-            V[j]=reduce(lambda a,_: (max(a[0],a[1] if j==a[1] else V[j-a[1]]*a[1]),a[1]*i),range(ilog(j,i)),(V[j],i))[0]
-        #V[i:n+1]=lap(lambda j: reduce(lambda a,_: (max(a[0],V[j-a[1]]*a[1]),a[1]*i),range(ilog(j-1,i)+1),(V[j],i))[0],range(i,n+1)) #cannot be done because they consider other values also
-    return(V[-1] if o else V)
-#print('\n'.join(map(str,enumerate(A000793(48,False)))))
-
-shifty=(lambda n,i=False: tap(((lambda n: int(permutation(n)**-1)) if i else permutation.__int__),redumulate(lambda n,k: (lambda k: [n[k]]+n[:k]+n[k+1:])(factoriactors(k)),range(fact(n)),list(range(n))))[1:]) #I don't like the look of this function
-#print(shifty(5,True));exit() #(not in the OEIS :-)
-permorials=(lambda n,r=False: tap(int,redumulate(lambda n,k: __mul__(*(n,permutation(k))[::(-1)**r]),range(1,n),permutation(0)))) #like factorials (...4*3*2*1 if r else 1*2*3*4...) but with permutation composition as the multiplication method
-#print('\n'.join(map(lambda r: str(permorials(fact(5),r)),range(2))));exit() #(neither is in the OEIS :-)
-inequalities=lambda n: sum(map(lambda p: all(tarmap(lambda i,p: __gt__(*p)==n>>i&1,enumerate(pairwise(permutation(p)[:n.bit_length()+1])))),range(fact(n.bit_length()+1))))
-inequalities=lambda n: sum(reduce(lambda r,k: tap(lambda i: sum(r[:i] if n<<1>>k&1 else r[i:]),range(k+1)),range(n.bit_length()+1),(1,)))
-
-#inequalitiess=lambda n: fact(n.bit_length()+1)*reduce(lambda r,k: sum(map(lambda i: r[i]*(x**(i+1) if n>>k&1 else 1-x**(i+1))/(i+1),range(k+1))),range(n.bit_length()+1),polynomial(1))(0)
-
-inequalitiess=lambda n: fact(n.bit_length()+1)*sum(reduce(lambda r,k: r.inte() if n>>k&1 else sum(i:=r.inte())-i,range(n.bit_length()),polynomial(1)))
+def DELTA(R,S): #this implementation from https://oeis.org/wiki/User:Peter_Luschny/SequenceTransformations#Deleham_delta
+    L=min(len(R),len(S))+1
+    A=[R[k]+x*S[k] for k in range(L-1)]
+    C=[0]+[x/x]*L
+    for k in range(1,L+1):
+        for n in revange(1,k): C[n]=C[n-1]+C[n+1]*A[n-1]
+        yield([C[1][n] for n in range(k)])
 
 
-#print(','.join(map(lambda n: str(cycles(permutation(n),True)),range(16))))
-'''a=b=()
-for n in count():
-    b+=tap(lambda k: int(permutation(k)),((lambda f: range(f,f*n))(fact(n-1)) if n else (0,)))
-    print(b)
-    #print(n,rle(sorted(map(lambda k: permutation(k).cycles(True),((lambda f: range(f,f*n))(fact(n-1)) if n else (0,))))))
-    a=tarmap(int.__add__,zip_longest(a,(lambda s: tap(s.count,range(A000793(n)+1)))(sorted(map(lambda k: permutation(k).cycles(True),((lambda f: range(f,f*n))(fact(n-1)) if n else (0,))))),fillvalue=0)) #A057731
-    #print(str(n)+':',','.join(map(str,a))+',')
-    #print(str(n)+':',','.join(map(lambda r: str(r[1]),rle(sorted(map(lambda k: permutation(k).cycles(True),range(fact(n)))))))+',') #rle version of above sequence, so forgoing 0s (not very interesting)
-    #print(str(n)+':',str(max(map(lambda k: permutation(k).cycles(True),((lambda f: range(f,f*n))(fact(n-1)) if n else (0,))),default=0))+',') #A000793
-    #print(n,lcm(*map(lambda k: permutation(k).cycles(True),((lambda f: range(f,f*n))(fact(n-1)) if n else (0,)))))
-    if n>4:
-        break
-exit()'''
+'''def isprime(n): #using AKS; much worse than SymPy
+   if n<4: return(n>1)
+   if not n&1: return False
+   for i in range(2,n.bit_length()):
+      if n==inthroot(n,i)**i: return False
+   r=3
+   while r==3 or (q:=factorise(r-1,1)[-1][0])<(maxa:=ceilsqrt(4*r)*(n-1).bit_length()) or pow(n,(r-1)//q,r)==1: #move the 2* onto inside for more downward precision
+      if not n%r: return False
+      if r>=ceilsqrt(n): return True
+      r=nextprime(r)
+   return all(map(lambda a: squow(x-a,n,mul=lambda a,b: tap(lambda i: sum(map(lambda j: a[j]*b[(i-j)%r]%n,range(r))),range(r)))==x**(n%r)+-a%n,range(1,maxa+1))) #would be ntt.convolve(a,b,r,False,n) if r were a power of 2'''
 
-'''print('\n'.join(map(lambda n: str(permutation(n)),range(16))))
-print(tap(lambda n: permutation(n).order(),range(16)))
-print(tap(lambda n: A002262(n,True),range(16)))
-#print(tap(permutation,range(16)))
-print(tap(lambda n: int(permutation.__mul__(*map(permutation,A002262(n,True)))),range(16)))
-print(tap(lambda n: int(permutation.__mul__(*map(permutation,reversed(A002262(n,True))))),range(16)))
-print(tap(lambda n: int(permutation(n)**-1),range(16))) #A056019'''
+def sqrtmod(n,p): #Tonelli-Shanks
+    assert legendreSymbol(n,p)==1,str(n)+' is not square mod '+str(p)
+    q=p-1
+    q>>=(s:=val2(q))
+    if s==1: #for primes ≡ 3 (mod 4) it's really really easy
+        return pow(n,p+1>>2,p)
+    z=next(filter(lambda z: legendreSymbol(z,p)==p-1,range(2,p)))
+    c=pow(z,q,p)
+    r=pow(n,q+1>>1,p)
+    t=pow(n,q,p)
+    while (t-1)%p:
+        t2=t
+        for i in range(s): #(multiplicative order of t mod p) ≡ 2**i
+            if not (t2-1)%p: break
+            t2=t2**2%p
+        c=pow(c,1<<s+~i,p)
+        r=r*c%p
+        c=c**2%p
+        t=t*c%p
+        s=i
+    return r
 
-def shed(f,l,i): #like a snake, not a garden building
-    if type(l)==list:
-        while l:
-            (y,i)=f(i,l.pop(0))
-            yield(y)
-    else:
-        for j in l:
-            (y,i)=f(i,j)
-            yield(y)
-antidiagonal=lambda x,y,d,valx=0,valy=0: (max(d+1-y,0),min(d+1-0,x))#(max(d+1-y,valx),min(d+1-valy,x)) #d being index
-
-def trim(*a): #a little bit off the top (only the leading zeros)
-    for i in range(min(map(lambda p: 1 if type(p)==int else len(p),a))):
-        if any(map(lambda a: a if type(a)==int else a[i],a)): break
-    else: raise(ValueError(a,'what the heck'))
-    return(tap(lambda a: (a,) if type(a)==int else a[i:],a))
-deg=lambda p: len(p)-1 #for convenience
-sup=lambda i,sups=True: ''.join(map(lambda n: '⁰¹²³⁴⁵⁶⁷⁸⁹'[int(n)],str(i))) if sups else '**'+str(i)
-denom=lambda p: lcm(*map(lambda n: n.denominator if type(n)==frac else 1,p))
-
-bernoulli=lru_cache(lambda n: frac(-1,2)**n if n<2 else ~n&1 and sum(map(lambda k: frac(choose(n,k),k+~n)*bernoulli(k),range(n)))) #non-recursive form: lambda n: sum(map(lambda k: frac(sum(map(lambda r: (-1)**r*choose(k,r)*r**n,range(k+1))),k+1),range(n+1)))
-gregory=lru_cache(lambda n: sum(map(lambda k: frac((-1)**k,k)*gregory(n+1-k),range(2,n+2))) if n else 1)
-
-class polynomial:
-    def __init__(p,*l):
-        p.internal=tuple(reduce(polynomial.__mul__,l[0])) if type(l[0])=='polyprod' else sum(starmap(lambda i,c: c*chooseby(i),enumerate(l[0]))) if type(l[0])==polychoose else l[0].internal if type(l[0])==polynomial else (lambda t: t[:len(t)-next(filter(t[::-1].__getitem__,range(len(t))))] if any(t) else (0,))(tuple(l[0]) if len(l)==1 and isinstance(l[0],Iterable) else tuple(l)) #do not add  (too many problems)
-    valx=lambda p: next(filter(p.__getitem__,range(len(p))),0)
-    __iter__=lambda p: iter(p.internal)
-    __call__=lambda p,x: sum(starmap(lambda i,c: c*x**i,enumerate(p)))
-    __repr__=lambda p,sups=True,x='x',frac=True: (lambda de,t: '('*(t!=1!=de)+(''.join(starmap(lambda i,c: (lambda n,d: bool(n)*(('-' if sgn(n)==-1 else '+'*any(p[:i]))+str(abs(n))*(abs(n)!=1 or not i)+'*'*(i and abs(n)!=1)+(x+sup(i,sups)*(i>1))*bool(i)+(d!=1)*('/'+str(d))))(*((int(de*c),1) if frac else (c.numerator,c.denominator) if type(c)==Fraction else (c,1))),enumerate(p))) if t else '0')+(')'*(t!=1)+'/'*(1+(0 and not gcd(p)%1))+str(de))*(1!=de))(denom(p) if frac else 1,sum(map(bool,p)))
-    __len__=lambda p: len(p.internal)
-    __getitem__=lambda p,i: polynomial(p.internal[i]) if type(i)==slice else int(i<len(p)) and p.internal[i%len(p)]
-    pop=lambda p,i=-1: p.internal.pop(i)
-    __add__=lambda a,b: a+polynomial(b) if isinstance(b,Number) else polynomial(starmap(__add__,zip_longest(a,polynomial(b),fillvalue=0)))
-    __neg__=lambda p: polynomial(-p if isinstance(p,Number) else map(__neg__,p))
-    __sub__=lambda a,b: a+polynomial.__neg__(b)
-    __rsub__=lambda a,b: -a+b
-    __mul__=lambda a,b,trans=False: a*polynomial(b) if isinstance(b,Number) else polynomial(cyclicConvolve(a,b,pad=True) if trans else (0,)*(polynomial.valx(a)+polynomial.valx(b))+tap(lambda i: sum(map(lambda j: a[j]*b[i-j],range(*antidiagonal(len(a),len(b),i,polynomial.valx(a),polynomial.valx(b))))),range(polynomial.valx(a)+polynomial.valx(b),len(a)+len(b)-1)))
-    __radd__=__add__
-    __rmul__=__mul__
-    __pow__=lambda a,n: squow(a,n,__mul__,polynomial(1))#funcxp(a.__mul__,n)(polynomial(1))
-    __rtruediv__=lambda a,b: polynomial.__truediv__(b,a)
-    __bool__=lambda p: p!=0
-    __mod__=lambda p,q: Y(lambda f: lambda p: polynomial(p) if len(p)<len(q) else f(p[:-len(q)]+tap(__sub__,p[-len(q):-1],map(frac(p[-1],q[-1]).__mul__,q.internal[:-1]))))(p.internal)
-    moddiv=lambda p,q: Y(lambda f: lambda r,p: (polynomial(p),polynomial(r)) if len(p)<len(q) else f((pi:=frac(p[-1],q[-1]),)+r,p[:-len(q)]+tap(__sub__,p[-len(q):-1],map(pi.__mul__,q.internal[:-1]))))((),p.internal)
-    gcd=lambda p,q: polynomial.gcd(q,p) if len(p)<len(q) else polynomial.gcd(q,(lambda p: p and p/glccdm(*p))(p%q)) if q else p
-    __truediv__=lambda p,q,frac=True: p*Fraction(1,q) if isinstance(q,Number) else p and (lambda p,q: polynomial(shed(lambda r,i: (lambda d: (d,tarmap(lambda c,p: p-c*d,zip_longest(q[1:],r[1:]+(0,),fillvalue=0))))(nicediv(r[0],q[0],frac)),range(len(p)+1-len(q)),p)))(*trim(p,q))
-    infdiv=lambda p,q,frac=True: polyfrac(p,q,frac=frac) #shed(lambda r,i: (lambda d: (d,tarmap(lambda c,p: p-c*d,zip_longest(q[1:],r[1:]+(0,),fillvalue=0))))(nicediv(r[0],q[0],frac)),count(),p)
-    __eq__=lambda a,b: len(a)==1 and a[0]==b if type(b)==int else a.internal==(b.internal if type(b)==polynomial else b)
-    __lshift__=lambda p,n: polynomial((0,)*n+p.internal)
-    __rshift__=lambda p,n: polynomial(p.internal[n:])
-    abs=lambda p: next(map(sgn,filter(id,p.internal)))*p
-
-    diff=lambda p: polynomial(starmap(__mul__,enumerate(p[1:],start=1)))
-    inte=lambda p: polynomial(0,*starmap(rFraction,enumerate(p,start=1)))
-    differences=lambda p: polynomial(matmul((p,),tap(lambda n: tap(lambda k: k<n and choose(n,k),range(len(p))),range(len(p))))[0]) #polynomial(polychoose(p)[1:]) #outputs b(n) = a(n+1)-a(n), gf multiplication by (1-x)/x
-    partialSums=lambda p: polynomial(matmul((p,),tuple(redumulate(lambda r,n: (0,bernoulli(n))+tarmap(lambda i,c: c*frac(n,i+2),enumerate(r[1:n+1]))+(0,)*(deg(p)-n),range(1,len(p)),(0,1)+(0,)*deg(p))))[0]) #polynomial((0,)+polychoose(p)) #upper-exclusive, multiplication by x/(1-x)
-
-class polychoose:
-    def __init__(p,*l):
-        p.internal=(tuple(polychoose(polynomial(l[0]))) if type(l[0])=='polyprod' else
-                    polychoose(matmul((l[0],),tuple(redumulate(lambda r,i: tap(int.__mul__,(1+x)*r,range(i+1))+(0,)*(len(l[0])+~i),range(1,len(l[0])),(1,)+(0,)*deg(l[0]))))[0]) if type(l[0])==polynomial else #matrix is inverse(tap(lambda r: tuple(r)+(0,)*(len(p)-len(r)),redumulate(lambda r,i: r*(x-i)/(i+1),range(deg(p)),x/x)))
-                    l[0].internal if type(l[0])==polychoose else (lambda t: t[:len(t)-next(filter(t[::-1].__getitem__,range(len(t))))] if any(t) else (0,))(tuple(l[0]) if len(l)==1 and isinstance(l[0],Iterable) else tuple(l))) #do not add  (too many problems)
-    __iter__=lambda p: iter(p.internal)
-    __call__=lambda p,x: sum(starmap(lambda i,c: c*choose(x,i),enumerate(p)))
-    __repr__=lambda p,sups=True,x='x',frac=True: (lambda de,t: '('*(t!=1!=de)+(''.join(starmap(lambda i,c: (lambda n,d: bool(n)*(('-' if sgn(n)==-1 else '+'*any(p[:i]))+str(abs(n))*(abs(n)!=1)+'*'*(abs(n)!=1)+'c('+x+','+str(i)+')'+(d!=1)*('/'+str(d))))(*((int(de*c),1) if frac else (c.numerator,c.denominator) if type(c)==frac else (c,1))),enumerate(p))) if t else '0')+(')'*(t!=1)+'/'*(1+(0 and not gcd(p)%1))+str(de))*(1!=de))(denom(p) if frac else 1,sum(map(bool,p)))
-    __len__=lambda p: len(p.internal)
-    __getitem__=lambda p,i: polychoose(p.internal[i]) if type(i)==slice else int(0<=i<len(p)) and p.internal[i]
-    pop=lambda p,i=-1: p.internal.pop(i)
-    __add__=lambda a,b: a+polychoose(b) if isinstance(b,Number) else polychoose(starmap(__add__,zip_longest(a,polychoose(b),fillvalue=0)))
-    __neg__=lambda p: polychoose(-p if isinstance(p,Number) else map(__neg__,p))
-    __sub__=lambda a,b: a+polychoose.__neg__(b)
-    __rsub__=lambda a,b: -a+b
-    __mul__=lambda a,b: polychoose(polynomial(a)*polynomial(b)) #lambda a,b: sum(starmap(lambda i,j: chooseprod(i,j)*a[i]*b[j],product(range(len(a)),range(len(b)))))
-    __radd__=__add__
-    __rmul__=__mul__
-    __pow__=lambda a,n: squow(a,n,__mul__,polychoose(1))#funcxp(a.__mul__,n)(polynomial(1))
-    __rtruediv__=lambda a,b: polychoose.__truediv__(b,a)
-    __bool__=lambda p: p!=0
-    __truediv__=lambda a,b,frac=True: a*Fraction(1,b) if isinstance(b,Number) else polychoose(polynomial.__truediv__(polynomial(a),polynomial(b),frac))
-    __eq__=lambda a,b: len(a)==1 and a[0]==b if type(b)==int else a.internal==(b.internal if type(b)==polynomial else b)
-    __lshift__=lambda p,n: polychoose((0,)*n+p.internal)
-    __rshift__=lambda p,n: polychoose(p.internal[n:])
-    abs=lambda p: next(map(sgn,filter(id,p.internal)))*p
-
-    diff=lambda p: polychoose(matmul((p,),tuple(redumulate(lambda r,i: (frac((-1)**i,i+1),)+r[:-1],range(len(p)),(0,)*len(p))))[0]) #polychoose(polynomial(p).diff())
-    inte=lambda p: polychoose(matmul((p,),tuple(redumulate(lambda r,i: (0,gregory(i+1))+r[1:-1],range(len(p)),(0,)+(1,)+(0,)*deg(p))))[0]) #polychoose(polynomial(p).inte())
-    differences=lambda p: p>>1
-    partialSums=lambda p: p<<1
-
-x=polynomial(0,1);c=polychoose(0,1) #for convenience
-#fit=lambda *t: polynomial(tap(rgetitem(0),matmul(inverse(tap(lambda n: tap(lambda k: n[0]**k,range(len(t))),t)),tap(lambda n: (n[1],),t)) if type(t[0])==tuple else matmul(inverse(tap(lambda n: tap(lambda k: n**k,range(len(t))),range(len(t)))),tap(lambda n: (n,),t)))) #O(n**3)
-fit=lambda *t: (lambda t: sum(map(lambda n: prod(map(lambda k: (k[0]-x)/(k[0]-t[n][0]),t[:n]+t[n+1:]),1)*t[n][1],range(len(t)))))(t if type(t[0])==tuple else tuple(enumerate(t))) #O(n**2) (thank you Lagrange)
-
-chooseby=lambda k: reduce(lambda r,i: r*(x-i),range(k),x/x)/fact(k) #polynomial, chooseby(k)(n) is choose(n,k)
-chooseprod=lambda n,m: polychoose((0,)*max(n,m)+tap(lambda i: choose(n,i-m)*choose(i,n),range(max(n,m),n+m+1))) #polychoose expansion of choose(x,n)*choose(x,m) (${x\choose n}\cdot{x\choose m}=\sum_{i=m}^{n+m}({n\choose i}\cdot{m+i\choose n}\cdot{x\choose i})$)
-#chooseprod=lambda n,m: polychoose((0,)*max(n,m)+tap(lambda i: choose(max(n,m),i-min(n,m))*choose(i,max(n,m)),range(max(n,m),n+m+1)))
-
-class polyfrac: #for representing rational generating functions
-    __repr__=lambda f: '('+str(f.a)+')/('+str(f.b)+')'
-    def __init__(f,a,b=None,frac=True):
-        f.frac=frac
-        if type(a)==polyfrac:
-            f.a,f.b=a.a,a.b
-            if b!=None:
-                if type(b)==polyfrac:
-                    f.a*=b.den
-                    f.b*=b.num
-                else:
-                    f.b*=b
-        else:
-            if b==None:
-                if isinstance(a,Iterable) and isinstance(a[0],Iterable):
-                    (a,b)=a
-                else:
-                    b=1
-            (f.a,f.b)=map(lambda n: polynomial(n) if isinstance(n,Iterable) else (n,),(a,b))
-        g=polynomial.gcd(f.a,f.b);f.a/=g;f.b/=g
-        '''(fa,fb)=tap(factorise,(f.a,f.b))
-        for a in fa:
-            if a in fb:
-                del(fb.internal[fb.index(a)])
-                del(a)
-        f.a,f.b=tap(lambda t: reduce(polynomial.__mul__,t,polynomial(1)),(fa,fb))'''
-        f.ma=f.a
-        f.expanded=[]
-    def __next__(f):
-        d=nicediv(f.ma[0],f.b[0],f.frac)
-        f.ma=tarmap(lambda c,a: a-c*d,zip_longest(f.b[1:],f.ma[1:]+(0,),fillvalue=0))
-        f.expanded.append(d)
-        return(d)
-    __iter__=lambda f: map(lambda _: next(f),count())
-    __len__=lambda f: len(f.expanded)
-    __getitem__=lambda f,n: tap(f.__getitem__,range(n.start or 0,n.stop,n.step or 1)) if type(n)==slice else (f.expanded[n] if n<len(f.expanded) else Y(lambda g: lambda _: f.expanded[n] if n<len(f) else g(next(f)))(None))
-    num=lambda f: f.a
-    den=lambda f: f.b
-    __add__=lambda a,b: (lambda b: (lambda l: polyfrac((a.num*l/a.den+b.num*l/b.den),l))(lcm(a.den,b.den)))(polyfrac(b))
-    matrix=lambda f: (f.a+(len(f.b)-len(f.a))*(0,),(f.b,)+tap(lambda i: i*(0,)+(1,)+(len(f.b)+~i)*(0,),range(len(f.b)-1))) #allows matpow
-    __call__=lambda f,x: frac(f.a(x),f.b(x))
-gfslice=lambda a,b,l=None: tuple(islice(polynomial.infdiv(a,b),0,len(a) if l==None else l)) #first terms of a/b, where a is the first known terms of its actual expansion
-
-
-class polyprod:
-    def __init__(p,*a):
-        a=tap(polynomial,chap(kronecker,a)) #linearFactors
-        p.d=prod(map(denom,a))
-        p.internal=lilter((1).__ne__,tap(lambda p: denom(p)*p,a))
-        if not(len(p.internal)): p.internal=[polynomial(1),]
-    __repr__=lambda p: '*'.join(starmap(lambda f,m: f+(m!=1)*sup(m),rle(map(lambda n: (b:=len(tilter(id,n))!=1)*'('+str(n)+b*')',p))))+(p.d!=1)*('/'+str(p.d))
-    __len__=lambda p: len(p.internal)
-    __iter__=lambda p: iter(p.internal)
-    index=lambda p,f: p.internal.index(f)
-    __getitem__=lambda p,i: p.internal[i]
-    __call__=lambda p,x: prod(map(rcall(x),p))
-    polynomial=lambda p: prod(p,polynomial(1))
-
-def linearFactors(p):
-    if any(p):
-        outer=gcd(*p)
-        p=tap(outer.__rfloordiv__,p)
-        linears=[]
-        while not p[0]: linears.append((0,1));p=p[1:]
-        happy=False
-        for f in range(len(p)-1): #degree n (length n+1) has n roots
-            g=gcd(*p)#(p[0],p[-1])
-            frac=tap(lambda n: factorise(abs(n//g),True),(p[0],p[-1]))
-            candidate=lap(lambda f: lap(lambda i: 0,range(len(f))),frac)
-            shareds=lap(lambda f: len(frac[1]) and next(map(lambda i: f[0] and not p[-1]%f[0] and frac[1][i][0]==f[0],range(len(frac[1])))),frac[0]) #why is next like this :-(
-            happy=sad=False #my feeling when
-            while True:
-                test=tap(lambda f,c: prod(map(lambda f,c: f[0]**c,f,c)),frac,candidate)
-                for sign in (1,-1): #this could be optimised slightly using Descartes's law of signs (but not verily)
-                    evaluation=sum(starmap(lambda i,c: c*(sign*test[0])**i*test[1]**(len(p)+~i),enumerate(p)))
-                    #print(test,evaluation)
-                    if not evaluation: happy=True;break #root found :-)
-                if happy:
-                    break
-                i=j=0
-                #print('c',i,j,candidate)
-                if any(frac):
-                    while True:
-                        if candidate[i]:
-                            candidate[i][j]+=1
-                            if candidate[i][j]<=frac[i][j][1] and not(not(i) and shareds[j] and candidate[0][j]): #do not have same factor in both
-                                break
-                            candidate[i][j]=0
-                        j+=1
-                        #print(i,j,j>=len(candidate[i]),sad)
-                        if j>=len(candidate[i]):
-                            if i: sad=True;break
-                            else: i+=1;j=0 #not i=1 because maybe one day we will have 3-sided fractions
-                    if sad: break
-                else: break
-            if happy:
-                frac=tap(lambda f,c: tap(lambda f,c: (f[0],f[1]-c),f,c),frac,candidate)
-                p=tuple(polynomial.__truediv__(p,(test[0],-sign*test[1])))
-                linears.append((test[0],-sign*test[1]))
-            else: break #raise(ValueError('not factorisable :-(',linears)) #however it will check roots of unity
-        r=((outer,),)*(outer!=1)+tuple(linears)+(p,)*(not happy)
-    else: r=((0,),)
-    r=tilter(lambda p: p!=polynomial(1),r)
-    return(r)#(polyprod(*r) if prod else r)
-
-def kronecker(p,little=False): #highly inefficient but works over the integers
-    denom=lcm(*map(lambda c: c.denominator if type(c)==frac else 1,p.internal))
-    p=denom*p
-    l=[]
-    r=((),)
-    i=0
-    while i<=deg(p)>>1:
-        if p(i):
-            r=tarmap(tuple.__add__,product(r,map(lambda n: (n,),(f:=divisors(p(i)))+tap(__neg__,f))))
-            if i:
-                for t in r:
-                    if deg(d:=fit(*enumerate(t[:i+1])))==i and p/d*d==p:
-                        d=d.abs() if little else d[::-1].abs()[::-1] #unfortunately more elegant for sign preservation for arbitrarily large x (little-endian enthusiasts we got too cocky)
-                        l.append(d);p/=d;r=((),);i=0;break
-                else: i+=1
-            else: i+=1
-        else: l.append(d:=(x-i)*(-1)**little if i else x);p/=d;r=((),);i=0
-    return(l+[p/denom])
-
-def solveGf(gf,analytic=True): #non-analytic (integer arithmetic) solution only works where denominator roots are rationals and nth roots of which (not including Fibonaccis, but fortunately partitions, https://oeis.org/A000008 style :-)
-    expansion=tuple(reduce(polynomial.__mul__,gf[1])) if isinstance(gf[1][0],Iterable) else gf[1]
-    #elif type(gf[1][0])==int: #assuming the user read the warning, all rational roots of a polynomial of the form (λ x: z+y*x+...+b*x**(n-1)+a*x**n) are of the form ±n/d, where n divides z and d divides a
-    factors=list(linearFactors(expansion))
-    powereds=[]
-    if len(factors[-1])>2:
-        remaining=factors.pop()
-        p=2
-        while p<len(remaining):
-            parts=lap(lambda i: list(linearFactors(remaining[i::p])),range(p))
-            nonzero=0 #very suspicious
-            while nonzero<len(parts):
-                if any(parts[nonzero]): break
-                nonzero+=1
-            else: raise(ValueError('only darkness now')) #this will not occur
-            i=0
-            while i<len(parts[nonzero]):
-                a=parts[nonzero][i]
-                if all(map(lambda pa: not(any(map(any,pa))) or a in pa,parts[nonzero+1:])):
-                    powereds.append((a[0],)+(0,)*(len(parts[nonzero][i])-1)+(a[1],))
-                    #print('a',a,parts,remaining[i::p])
-                    for pa in parts[nonzero+1:]:
-                        if any(map(any,pa)): del(pa[pa.index(a)])
-                    del(parts[nonzero][i])
-                else: i+=1
-            remaining=reduce(polynomial.__truediv__,powereds,remaining)
-            p+=1
-        remaining=tuple(remaining)
-        factors+=powereds+(analytic and remaining!=(1,))*[remaining]
-    #g.f. denominator (p+q*x**d) has nth term = sum of ((p/q)**(1/d)*(d'th root of unity))**n,
-    #                             equivalently, sum of  (p/q)**(n//d)*((n+k)%d) over k, computable as (sum of ((n+k)%d))*p**(n//d)//q**(n//d)
-    if analytic:
-        roots=tuple(chap(lambda f: quadroots(f) if deg(f)==2 else tap(lambda i: surd([[[abs(f[-1]),abs(f[0])],deg(f)]],i=i),range(deg(f))) if deg(f) else (),factors))
-    degrees=tuple(map(deg,factors))
-    terms=sum(degrees) #more suspiciously, sum(map(len,factors))-len(factors)
-    vec=gfslice(gf[0],expansion,terms)
-    functions=lambda coeffs: map(lambda c,r: lambda n: c*(id if type(r) in {int,frac,surd} else complex if r.imag else float)(r)**n,coeffs,roots) if analytic else map(lambda c,r: lambda n: c*r(n),coeffs,chap(lambda f: tap(lambda k: lambda n: (1 if deg(f)==1 else (n+k)%deg(f))*(-frac(f[-1],f[0]))**(n//deg(f)),range(deg(f))),factors))
-    comp=lambda coeffs: tuple(zip(*(map(lambda f: tap(f,range(terms)),functions(coeffs)))))
-    mat=inverse(comp((1,)*terms),f=False)
-    coeffs=(lambda w: tap(lambda f: tap(lambda i: w.pop(0),range(deg(f))),factors))(lap(lambda i: sum(map(lambda j: mat[i][j]*vec[j],range(terms))),range(terms)))
-    f=tuple(functions(chain.from_iterable(coeffs)))
-    return(lambda n: sum(map(lambda f: f(n),f)))
-
-def recurrence(f,order,limdex):
-    r=[]
-    begin=0
-    while begin<limdex:
-        try:
-            r.append((tap(int,t) if all(map(lambda n: n.denominator==1,t:=tap(rgetitem(0),matmul(inverse(t),tap(lambda i: (f(begin+order+i),),range(order))))[::-1])) else t) if any(t:=tap(lambda i: tap(f,range(begin+i,begin+order+i)),range(order))) else (0,)*order)
-            begin+=1
-        except: return(None)
-    return((r[-1],limdex+~Y(lambda f: lambda i: f(i+1) if r[-i]==r[-1] and i<limdex else i-1)(1)))
-
-def findRecurrence(f,maxder=8,limdex=16,threshold=8,minder=1):
-    for order in range(minder,maxder):
-        r=recurrence(f,order,limdex)
-        if r!=None:
-            (r,first)=r
-            sat=limdex+~first
-            if sat>=threshold: return(r,first)
-    return(None)
-
-findGf=lambda f,r,first: ((denominator:=polynomial((1,)+tap((-1).__mul__,r)))*tap(f,range(first))+(first*(0,)+tap(rgetitem(0),matmul(inverse(tap(lambda i: (len(r)+~i)*(0,)+gfslice((1,),denominator,i+1),range(len(r)))),tap(lambda n: (f(n),),range(first,first+len(r)))))[::-1]),denominator)
-gf=lambda f,lim=16,threshold=8,min=1,frac=False: funcxp(polyfrac,frac)(findGf(f:=lru_cache(maxsize=lim)(f),*findRecurrence(f,lim,lim+threshold,threshold,min)))
 period=lambda t: Y(lambda f: lambda n: n if all(tap(lambda i: all(map(__eq__,t[:n],t[i*n:(i+1)*n])),range(1,len(t)//n))) else f(n+1))(1)
 
-class matrix3: #flatly-encoded, implementing specific size for versor methods
-    def __init__(m,*t):
-        m.internal=((lambda t: (1-2*(t[2]**2  +t[3]**2  ),  2*(t[1]*t[2]-t[0]*t[3]),  2*(t[0]*t[2]+t[1]*t[3]),
-                             2*(t[1]*t[2]+t[0]*t[3]),1-2*(t[1]**2  +t[3]**2  ),  2*(t[2]*t[3]-t[0]*t[1]),
-                             2*(t[1]*t[3]-t[0]*t[2]),  2*(t[0]*t[1]+t[2]*t[3]),1-2*(t[1]**2  +t[2]**2  )) if type(t)==versor else tuple(t))(*t)
-                    if len(t)==1 else matrix3(t))
-    __getitem__=(lambda m,i: m.internal[i])
-    unravelling=unraveller(3)
-    __matmul__=(lambda a,b: matrix3(matrix3.unravelling(a,b)))
-    __mul__=(lambda a,b: a@b if type(b)==matrix3 else a@matrix3(b) if type(b)==versor else vector3(tap(lambda r: dot(a[3*r:3*(r+1)],b),range(3))) if type(b)==vector3 else matrix3(tap(lambda i: b*i,a)) if isinstance(b,Number) else ValueError('wibble'))
-    det=(lambda m: m[0]*(m[4]*m[8]-m[5]*m[7])+m[1]*(m[5]*m[6]-m[3]*m[8])+m[2]*(m[3]*m[7]-m[4]*m[6]))
-    __rmul__=(lambda a,b: a*b)
-    def inverse(m):
-        det=m[0]*(m0:=m[4]*m[8]-m[5]*m[7])+m[1]*(m1:=m[5]*m[6]-m[3]*m[8])+m[2]*(m2:=m[3]*m[7]-m[4]*m[6])
-        return(matrix3(m0/det,(m[7]*m[2]-m[8]*m[1])/det,(m[1]*m[5]-m[2]*m[4])/det,
-                       m1/det,(m[8]*m[0]-m[6]*m[2])/det,(m[2]*m[3]-m[0]*m[5])/det,
-                       m2/det,(m[6]*m[1]-m[7]*m[0])/det,(m[0]*m[4]-m[1]*m[3])/det))
 
-
-class versor: #i through x (y to z), j through y (z to x), k through z (x to y) #no normalisation
-    def __init__(q,*t):
-        q.internal=((lambda t: (lambda u,q: tap((u**-0.5/2).__mul__,q))(*( ( (lambda u: (u,(t[3]-t[1],-t[2]-t[6],-t[5]-t[7], u        )))(1-t[0]-t[4]+t[8]) #my feeling when I cannot fast-inverse-square-root
-                                                          if t[0]<-t[4] else
-                                                           (lambda u: (u,(u        , t[7]-t[5], t[2]-t[6], t[3]-t[1])))(1+t[0]+t[4]+t[8]))
-                                                        if t[8]>0 else
-                                                         ( (lambda u: (u,(t[7]-t[5], u        ,-t[1]-t[3],-t[2]-t[6])))(1+t[0]-t[4]-t[8])
-                                                          if t[0]>t[4] else
-                                                           (lambda u: (u,(t[6]-t[2],-t[1]-t[3], u        ,-t[5]-t[7])))(1-t[0]+t[4]-t[8])))) #from https://d3cw3dd2w32x2b.cloudfront.net/wp-content/uploads/2015/01/matrix-to-quat.pdf
-                     if type(t)==matrix3 else tuple(t))(t[0])
-                    if len(t)==1 else versor(t))
-    __getitem__=(lambda m,i: m.internal[i])
-    __repr__=(lambda q: 'versor('+','.join(map(str,q.internal))+')')
-    __mul__=(lambda a,b: versor((a[0]*b[0]-a[1]*b[1]-a[2]*b[2]-a[3]*b[3],
-                      a[0]*b[1]+a[1]*b[0]+a[2]*b[3]-a[3]*b[2],
-                      a[0]*b[2]-a[1]*b[3]+a[2]*b[0]+a[3]*b[1],
-                      a[0]*b[3]+a[1]*b[2]-a[2]*b[1]+a[3]*b[0]))
-             if type(b)==versor else
-              versair(a*b[0],b[1]*a**-1)
-             if type(b)==versair else
-              matrix3(a)*b
-             if type(b) in {matrix3,vector3} else
-              versor(tap(lambda i: b*i,a))
-             if isinstance(b,Number) else
-              ValueError('wibble'))
-    __eq__=(lambda a,b: a.internal==b.internal)#(lambda a,b: all(map(__eq__,a,b)))
-    def log(q):
-        try: coeff=acos(q[0])/sqrt(1-q[0]**2) #the q[0] in the acos would be divided by magnitude if it weren't a unit vector
-        except: coeff=1 #I don't like it but it wouldn't detect float equality correctly
-        return(vector3((coeff*q[1],coeff*q[2],coeff*q[3]))) #0 would be log(magnitude)
-    __neg__=(lambda q: versor(map(__neg__,q)))
-    __add__=(lambda a,b: versor(map(__add__,a,b)))
-    __sub__=(lambda a,b: a+-b)
-    conjugate=(lambda q: versor((q[0],-q[1],-q[2],-q[3])))
-    __pow__=(lambda a,b: a.conjugate() if b==-1 else vector3.exp(versor.log(a)*b)) #special case can be removed if you would like more stability (living life on the edge)
-    sqrt=(lambda q: q**(1/2))
-    __truediv__=(lambda a,b: a*b**-1)
-    canonicalise=(lambda q: sgn(q*(rany(map(sgn,filter(lambda x: abs(x)>2**-16,q)))))) #renormalise to avoid accumulating precision loss, use sgn of first nonzero (and nonerror) term
-
-def slerp(a,b,t,x=None): #(b*a**-1)**t*a=exp(log(b*a**-1)*t)*a, derived in https://github.com/DroneBetter/Perspective3Dengine/blob/main/perspective%203D%20engine.py
-    dot=a[0]*b[0]+a[1]*b[1]+a[2]*b[2]+a[3]*b[3]
-    ang=t*acos(abs(dot))
-    bc=sin(ang)*sgn(dot,True)/sqrt(1-dot**2)
-    ac=cos(ang)-bc*dot
-    return((ac*a[0]+bc*b[0],
-            ac*a[1]+bc*b[1],
-            ac*a[2]+bc*b[2],
-            ac*a[3]+bc*b[3]))
-def rotationParameters(a,v,w,x=None): #'in general, to rotate by amount a from some versor v to a perpendicular versor w (while conserving the perpendicular components), you need the map (lambda x: (cos(a/2)+sin(a/2)*w*v**-1)*x*(cos(a/2)+sin(a/2)*v**-1*w))'
-    c=cos(a/2);s=sin(a/2)
-    if x==None:
-        #w*v**-1
-        left =versor((c+s*( w[0]*v[0]+w[1]*v[1]+w[2]*v[2]+w[3]*v[3]),
-                        s*(-w[0]*v[1]+w[1]*v[0]-w[2]*v[3]+w[3]*v[2]),
-                        s*(-w[0]*v[2]+w[1]*v[3]+w[2]*v[0]-w[3]*v[1]),
-                        s*(-w[0]*v[3]-w[1]*v[2]+w[2]*v[1]+w[3]*v[0])))
-        #v**-1*w
-        right=versor((c+s*( v[0]*w[0]+v[1]*w[1]+v[2]*w[2]+v[3]*w[3]),
-                        s*( v[0]*w[1]-v[1]*w[0]-v[2]*w[3]+v[3]*w[2]),
-                        s*( v[0]*w[2]+v[1]*w[3]-v[2]*w[0]-v[3]*w[1]),
-                        s*( v[0]*w[3]-v[1]*w[2]+v[2]*w[1]-v[3]*w[0])))
-        return(left,right)
-        #left*x*right (w*v**-1*x*v**-1*w)
-    else:
-        '''
-        b=(v[0]*w[1]-v[1]*w[0]+v[2]*w[3]-v[3]*w[2],
-           v[0]*w[2]-v[1]*w[3]-v[2]*w[0]+v[3]*w[1],
-           v[0]*w[3]+v[1]*w[2]-v[2]*w[1]-v[3]*w[0])
-        d=(v[0]*w[1]-v[1]*w[0]-v[2]*w[3]+v[3]*w[2],
-           v[0]*w[2]+v[1]*w[3]-v[2]*w[0]-v[3]*w[1],
-           v[0]*w[3]-v[1]*w[2]+v[2]*w[1]-v[3]*w[0])''' #equivalently,
-        p=tarmap(lambda i,v: tarmap(lambda j: v*w[j],filter(i.__ne__,range(4))),enumerate(v)) #would be tap(__mul__,product(v,w)) but some are extraneous
-        b=(p[0][0]-p[1][0]+p[2][2]-p[3][2],#+-+-
-           p[0][1]-p[1][2]-p[2][0]+p[3][1],#+--+
-           p[0][2]+p[1][1]-p[2][1]-p[3][0])#++--
-        d=(p[0][0]-p[1][0]-p[2][2]+p[3][2],#+--+
-           p[0][1]+p[1][2]-p[2][0]-p[3][1],#++--
-           p[0][2]-p[1][1]+p[2][1]-p[3][0])#+-+-
-        e=(c*x[0]+s*(-b[0]*x[1]-b[1]*x[2]-b[2]*x[3]),
-           c*x[1]+s*( b[0]*x[0]+b[1]*x[3]-b[2]*x[2]),
-           c*x[2]+s*(-b[0]*x[3]+b[1]*x[0]+b[2]*x[1]),
-           c*x[3]+s*( b[0]*x[2]-b[1]*x[1]+b[2]*x[0]))
-        return(versor((c*e[0]+s*(-d[0]*e[1]-d[1]*e[2]-d[2]*e[3]),
-                       c*e[1]+s*( d[0]*e[0]-d[1]*e[3]+d[2]*e[2]),
-                       c*e[2]+s*( d[0]*e[3]+d[1]*e[0]-d[2]*e[1]),
-                       c*e[3]+s*(-d[0]*e[2]+d[1]*e[1]+d[2]*e[0])))) #fastest method I have found (albeit non-composable), 52 multiplications instead of 72
-
-class versair: #initialisable directly from a rotationParameters, they act from the outside and compose accordingly (would be corsair if it were complex but they have no plane invariant to a rotation)
-    __getitem__=(lambda m,i: m.internal[i])
-    def __init__(p,*a): #maybe I will add a method for initialisation with orthogonal 4*4 matrices one day
-        p.internal=((lambda a: (a,a.conjugate()) if type(a)==versor else a)(a[0]) if len(a)==1 else a)
-    __repr__=(lambda p: 'versair('+','.join(map(str,p.internal))+')')
-    __mul__=(lambda a,b: versair(a[0]*b[0],b[1]*a[1]) if type(b)==versair else a[0]*b*a[1] if type(b)==versor else ValueError('wibble'))
-    __pow__=(lambda p,n: versair(p[0]**n,p[1]**n))
-    #__rmul__=(lambda a,b: versair(b*a[0],a[1]*b**-1) if type(b)==versor else a*b) #vector(versor0*versair*versor1)=versor0*vector(versair*versor1) (think about it for a moment)
-
-class vector3:
-    def __init__(v,*t):
-        v.internal=tuple(t[0] if len(t)==1 else t)
-    __getitem__=(lambda m,i: m.internal[i])
-    __iter__=(lambda v: iter(v.internal))
-    __repr__=(lambda v: 'vector3('+','.join(map(str,v.internal))+')')
-    __mul__=(lambda a,b: vector3(dot(a,b)) if type(b)==vector3 else vector3(tap(b.__rmul__,a)))
-    __rmul__=(lambda a,b: a*b) #because if the other type were something with a correct multiplication method, __rmul__ wouldn't be called
-    __matmul__=(lambda a,b: vector3((a[1]*b[2]-a[2]*b[1],
-                       a[2]*b[0]-a[0]*b[2],
-                       a[0]*b[1]-a[1]*b[0]))) #cross
-    __add__=(lambda a,b: vector3(map(__add__,a,b)))
-    __neg__=(lambda v: vector3(map(__neg__,v)))
-    __sub__=(lambda a,b: a+-b)
-    cross=lambda a,b: vector3(tap(lambda n: a[(n+1)%3]*b[(n-1)%3]-a[(n-1)%3]*b[(n+1)%3],range(3)))
-    dross=(lambda a,b: sum(a)*sum(b)-dot(a,b)) #useful in the perspective 3D engine's time mode
-    abs=(lambda v: sqrt(sum(map(lambda x: x**2,v))))
-    def exp(v): #meant to be specifically inverse of versor.log
-        expreal=1#e**q[0]
-        immag=hypot(*v) #cannot be sqrt(1-q[0]**2) due to logarithms not being unit vectors
-        coeff=expreal*(immag and sin(immag)/immag)
-        return(versor((expreal*cos(immag),coeff*v[0],coeff*v[1],coeff*v[2])))
 
 class coordinate:
     __repr__=lambda c: 'c('+','.join(map(str,c))+')'
@@ -936,7 +208,7 @@ class coordinate:
     __eq__=lambda a,b: a.parts==b.parts
     __lt__=lambda a,b: a.parts<b.parts
 #c=coordinate #for 'revity
-#c is now allocated for polychoose
+#amendment: c is now allocated for polychoose
 
 class polyomino:
     def __init__(p,*a):
@@ -955,8 +227,8 @@ class polyomino:
 champernowne=lambda n: floor((10**((n+(10**(i:=ceil(W(log(10)/10**(1/9)*(n-1/9))/log(10)+1/9))-10)//9)%i-i+1)*((9*n+10**i+9*i-2)//(9*i)-1))%10) #https://oeis.org/A033307 (thank you David W. Cantrell)
 A120385=lambda n: int(n==1) or (lambda m,d: (1<<k|d)>>m)(*moddiv(n-((k:=int(W((n-2)*log(2)/2)/log(2))+1)-1<<k)-2,k+1)) #=lambda n: int(n==1) or (1<<(k:=int(W((n-2)*log(2)/2)/log(2))+1)|(n-(k-1<<k)-2)//(k+1))>>(n-(k-1<<k)-2)%(k+1)
 
-
-dirichmul=lambda f,g: lambda n: sum(map(lambda d: f(d)*g(n//d),(1,)+factorise(n))) #dirichletConvolve
+squarefree=lambda n: all(starmap(lambda p,e: e<2,factorise(n,1)))
+dirichmul=dirichletConvolve=lambda f,g: lambda n: sum(map(lambda d: f(d)*g(n//d),(1,)+factorise(n)))
 dirichlow=lambda f,n: squow(f,n-1,dirichmul,f) if n else compose((1).__eq__,int) #squow(f,n,dirichmul,(1).__eq__)#lambda f,n: reduce(lambda r,i: lambda n: dirichmul(r,f),range(n),id) #dirichlexponent
 class dirichlefy:
     def __init__(d,f): d.f=f
@@ -965,7 +237,22 @@ class dirichlefy:
     __pow__=lambda f,n: dirichlefy((f**-1)**-n if n<-1 else Y(lambda g: lambda n: (1 if n==1 else frac(-sum(map(lambda d: f(n//d)*g(d),divisors(n)[:-1])),f(1)))) if n==-1 else dirichlow(f.f,n))
 d=dirichlefy
 
-continued=lambda n,l,threshold=1<<10: shortduce(lambda r,i: (r[:-1]+(int(r[-1]),(m:=r[-1]%1) and 1/m),m and (not threshold or r[-1]<threshold)),range(l),(n,))[:-1]
+legendreSymbol=lambda n,p: pow(n,p-1>>1,p)
+def jacobiSymbol(n,k): #Jacobi symbol, not Jacobi theta function or Jacobian matrix
+    #equals prod(starmap(lambda p,i: legendresymbol(n,p)**i,factorise(k,1))), however is not computed like this because factorisation is slow (instead by same recurrence relation as Euclid's gcd accelerated by cancelling powers of 2)
+    if n==1: return 1
+    if not n: return k==1
+    if not k&1: return 0
+    n%=k
+    res=1
+    while n:
+        n>>=(v:=val2(n))
+        if k&7 in (3,5): res*=(-1)**v
+        if n&3==3==k&3: res*=-1
+        n,k=k%n,n
+    return k==1 and res
+kroneckerSymbol=lambda n,k: gcd(n,k)==1 and (n==1 or k==1 or (jacobiSymbol(n,k) if k&1 else n&1 and (-1)**(n+1>>2&1)*(k==2 or kroneckerSymbol(n,k>>1))))
+#Kronecker generalises Jacobi, which generalises Legendre
 
 if __name__=='__main__':
     mode=18
