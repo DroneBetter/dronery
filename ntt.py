@@ -1,6 +1,6 @@
 from itertools import count
 from sympy import primefactors,isprime
-from dronery.common import copy,expumulate,starmap,lap,bitverse,exchange,compose,maph,laph,modsum,prod
+from dronery.common import copy,expumulate,starmap,lap,bitverse,exchange,compose,maph,smp,laph,modsum,prod
 
 modmul=lambda c,m: lambda v: c*v%m
 
@@ -22,14 +22,14 @@ def transpow2(v,r,m):
                 v[o],v[j]=(v[j]-vo)%m,(v[j]+vo)%m
     return v
 
-fixlen=lambda v,l: v[:l] if l<len(v) else v+([0] if type(v)==list else (0,))*(l-len(v))
+fixlen=lambda v,l,fillvalue=0: v[:l] if l<len(v) else v+([fillvalue] if type(v)==list else (fillvalue,))*(l-len(v))
 
 def convolve(v0,v1,l=None,pad=False,m=None):
     v0,v1=map(list,(v0,v1))
     if l==None and not pad:
         if not 0<(l:=len(v0))==len(v1): raise ValueError()
     else:
-        if l==None: l=1<<(sum(map(len,(v0,v1)))-1).bit_length()
+        if l==None: l=1<<(smp(len,(v0,v1))-1).bit_length()
         v0=fixlen(v0,l);v1=fixlen(v1,l)
     if m==None:
         for m in count(prod(map(compose(maph(abs),max),(v0,v1)))*l<<1|1,l):

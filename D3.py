@@ -1,7 +1,9 @@
 from matrix_unraveller import unraveller
-from dronery.common import reshape,sgn
+from dronery.common import dbg,reduce,frac,reshape,sgn,smp,tap,taph,chap,rany,Number,dot,pi,closure
+from dronery.perms import permutations,permutation
 from dronery.surd import*
-from math import sqrt,sin,cos,acos
+from math import sqrt,sin,cos,acos,hypot
+from operator import __neg__,__add__
 
 class matrix3: #flatly-encoded, implementing specific size for versor methods
     def __init__(m,*t):
@@ -126,7 +128,7 @@ def rotationParameters(a,v,w,x=None): #for 4D
 class versair: #initialisable directly from a rotationParameters, they act from the outside and compose accordingly (would be corsair if it were complex but they have no plane invariant to a rotation)
     __getitem__=(lambda m,i: m.internal[i])
     def __init__(p,*a): #maybe I will add a method for initialisation with orthogonal 4*4 matrices one day
-        p.internal=((lambda a: (a,a.conjugate()) if type(a)==versor else a)(a[0]) if len(a)==1 else a)
+        p.internal=((lambda a: (a,a.conjugate()) if type(a)==versor else a)(a[0]) if len(a)==1 else tap(versor,a))
     __repr__=(lambda p: 'versair('+','.join(map(str,p.internal))+')')
     __mul__=(lambda a,b: versair(a[0]*b[0],b[1]*a[1]) if type(b)==versair else a[0]*b*a[1] if type(b)==versor else ValueError('wibble'))
     __pow__=(lambda p,n: versair(p[0]**n,p[1]**n))
@@ -138,7 +140,7 @@ class vector3:
     __getitem__=(lambda m,i: m.internal[i])
     __iter__=(lambda v: iter(v.internal))
     __repr__=(lambda v: 'vector3('+','.join(map(str,v.internal))+')')
-    __mul__=lambda a,b: vector3(dot(a,b)) if type(b)==vector3 else vector3(tap(b.__rmul__,a))
+    __mul__=lambda a,b: vector3(dot(a,b)) if type(b)==vector3 else vector3(tap(lambda i: i*b,a)) #do not use b.__rmul__; produces NotImplemented when b is int and a is real
     __truediv__=lambda a,b: vector3(tap(b.__rtruediv__,a))
     __rmul__=(lambda a,b: a*b) #because if the other type were something with a correct multiplication method, __rmul__ wouldn't be called
     __matmul__=cross=(lambda a,b: vector3((a[1]*b[2]-a[2]*b[1],
@@ -148,10 +150,19 @@ class vector3:
     __neg__=(lambda v: vector3(map(__neg__,v)))
     __sub__=(lambda a,b: a+-b)
     dross=(lambda a,b: sum(a)*sum(b)-dot(a,b)) #useful in the perspective 3D engine's time mode
-    abs=(lambda v: sqrt(sum(map(lambda x: x**2,v))))
+    abs=(lambda v: sqrt(smp(lambda x: x**2,v)))
     sgn=lambda v: v/v.abs()
     def exp(v): #meant to be specifically inverse of versor.log
         expreal=1#e**q[0]
         immag=hypot(*v) #cannot be sqrt(1-q[0]**2) due to logarithms not being unit vectors
         coeff=expreal*(immag and sin(immag)/immag)
         return(versor((expreal*cos(immag),coeff*v[0],coeff*v[1],coeff*v[2])))
+
+if __name__=='__main__':
+    cell24=signventations((1,1,0,0))
+    #print(cell24)
+    print(r:=versair(rotationParameters(pi/3,(1,0,0,0),(0,)+(1/sqrt(surd(3)),)*3)))
+    r=(versair(*((surd(2)**frac(-1,2),)*2+(0,)*2,)*2),versair(*(((surd(3).sqrt()/2),)+((surd(3).sqrt()*2)**-1,)*3,)*2))[0:]
+    print(versair(rotationParameters(pi/2,(-1/sqrt(2),1/sqrt(2),0,0),(0,0,1/sqrt(2),-1/sqrt(2))))**3)
+    #print(closure(r,versair.__mul__,1))
+    #print(closure(r,versair(*(versor(1,0,0,0),)*2),False))

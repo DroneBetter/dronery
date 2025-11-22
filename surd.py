@@ -1,6 +1,6 @@
-from dronery.common import sgn,Fraction
+from dronery.common import reduce,shortduce,sgn,gcd,lcm,frac,inthroot,lap,starmap,smp,product
 from operator import __add__,__neg__,__sub__,__mul__,__floordiv__,__truediv__,__eq__,__or__,__gt__
-nicediv=lambda a,b,frac=True: a/b if type(a) in (s:={float,surd}) or type(b) in s else ((Fraction if frac else __truediv__) if a%b else __floordiv__)(a,b) #remain integer if possible
+nicediv=lambda a,b,fracMode=True: a/b if type(a) in (s:={float,surd}) or type(b) in s else ((frac if fracMode else __truediv__) if a%b else __floordiv__)(a,b) #remain integer if possible
 rnicediv=lambda b,frac=True: lambda a: nicediv(a,b,frac)
 
 def stractorise(struc,inds): #structure factorise
@@ -64,21 +64,22 @@ class surd:
             a.internal[0][0][0]*=-1
             a.i=0
         return(a.internal)
-    __eq__=(lambda a,b: a.internal==b.internal)
-    __add__=(lambda a,b: surd(a.internal+b.internal) if type(b)==surd else a+surd(b))
+    __eq__=lambda a,b: a.internal==b.internal
+    __add__=lambda a,b: surd(a.internal+b.internal) if type(b)==surd else a+surd(b)
     __radd__=__add__
-    __neg__=(lambda a: surd(lap(lambda a: [[-a[0][0],a[0][1]],a[1]],a.internal)))
-    __sub__=(lambda a,b: a+-b)
-    __rsub__=(lambda a,b: -a+b)
-    __mul__=(lambda a,b: surd(map(lambda a: [[a[0][0]*b,a[0][1]],a[1]],a)) if type(b)==int else surd([(lambda l: [[sgn(n)*sgn(m)*abs(n**(l//e)*m**(l//f)),d**(l//e)*c**(l//f)],l])(lcm(e,f)) for ((n,d),e),((m,c),f) in product(a,b)]))
+    __neg__=lambda a: surd(lap(lambda a: [[-a[0][0],a[0][1]],a[1]],a.internal))
+    __sub__=lambda a,b: a+-b
+    __rsub__=lambda a,b: -a+b
+    __mul__=lambda a,b: surd(map(lambda a: [[a[0][0]*b**a[1],a[0][1]],a[1]],a)) if type(b)==int else surd([(lambda l: [[sgn(n)*sgn(m)*abs(n**(l//e)*m**(l//f)),d**(l//e)*c**(l//f)],l])(lcm(e,f)) for ((n,d),e),((m,c),f) in product(a,b)])
     __rmul__=__mul__
-    __pow__=lambda a,n: surd(map(lambda r: (lambda l: [reduce(lambda a,b: [a[0]*b[0],a[1]*b[1]],starmap(lambda f,e: lap((l//e).__rpow__,f),r)),l])(lcm(*map(lambda r: r[1],r))),product(a.internal,repeat=n)) if n>0 else ([[[a[0][0][1],a[0][0][0]],a[0][1]]] if len(a)==1 else invquad(a.internal) if a.quadratic() else NotImplementedError) if n else 1)
+    __pow__=lambda a,n: surd(map(lambda r: (lambda l: [reduce(lambda a,b: [a[0]*b[0],a[1]*b[1]],starmap(lambda f,e: lap((l//e).__rpow__,f),r)),l])(lcm(*map(lambda r: r[1],r))),product(a.internal,repeat=n)) if n>0 and type(n)==int else ([[[a[0][0][0],a[0][0][1]][::sgn(n)],nicediv(a[0][1],abs(n))]] if len(a)==1 else invquad(a.internal) if a.quadratic() and n==-1 else NotImplementedError) if n else 1)
+    sqrt=lambda a: a**frac(1,2)
     __len__=lambda a: len(a.internal)
     quadratic=lambda a: len(a)==2 and sorted((a[0][1],a[1][1]))==[1,2] or len(a)==1 and a[0][1]<=2
-    __truediv__=(lambda a,b: surd(map(lambda t: [[t[0][0],t[0][1]*b],t[1]],a)) if type(b)==int else surd(lap(lambda t: [[t[0][0]**((l:=lcm(t[1],b[0][1]))//t[1])*b[0][0][0]**(l//b[0][1]),t[0][1]**(l//t[1])*b[0][0][1]**(l//b[0][1])],l],a)) if type(b)==surd and len(b)==1 else a*invquad(b.internal) if type(b)==surd and b.quadratic() else TypeError('wibble'))
-    __float__=(lambda a: float(sum(map(lambda b: sgn(b[0][0])*(abs(b[0][0])/b[0][1])**(1/b[1]),a)))*(-1)**nicediv(2*a.i,a[0][1],False))
-    __bool__=(lambda a: any(map(lambda a: a[0][0],a)))
-    __gt__=(lambda a,b: float(a)>float(b))
+    __truediv__=lambda a,b: surd(map(lambda t: [[t[0][0],t[0][1]*b**t[1]],t[1]],a)) if type(b)==int else surd(lap(lambda t: [[t[0][0]**((l:=lcm(t[1],b[0][1]))//t[1])*b[0][0][0]**(l//b[0][1]),t[0][1]**(l//t[1])*b[0][0][1]**(l//b[0][1])],l],a)) if type(b)==surd and len(b)==1 else a*invquad(b.internal) if type(b)==surd and b.quadratic() else TypeError('wibble')
+    __float__=lambda a: float(smp(lambda b: sgn(b[0][0])*(abs(b[0][0])/b[0][1])**(1/b[1]),a))*(-1)**nicediv(2*a.i,a[0][1],False)
+    __bool__=lambda a: any(map(lambda a: a[0][0],a))
+    __gt__=lambda a,b: float(a)>float(b)
     def __init__(a,t,i=0):
         a.i=i #for representing roots of unity
         a.internal=[[[t,1],1]] if type(t)==int else [[[t.numerator,t.denominator],1]] if type(t)==frac else list(t)

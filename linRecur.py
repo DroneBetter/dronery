@@ -32,7 +32,9 @@ def ogfDenom(l,p=None): #known as the Berlekamp-Massey algorithm
         cur=c
     return lap(mopt,fixlen(list(cur),lenc)) #stored as list instead of polynomial; this way it keeps trailing 0s that tell you how long the num should be
 
-gf=lambda l: polyfrac((l[:len(o:=1-x*ogfDenom(l))]*polynomial(o))[:len(o)],o)
+#gf=lambda l: polyfrac((l[:len(o:=1-x*ogfDenom(l))]*polynomial(o))[:len(o)],o)
+gf=lambda l: polyfrac((l[:len(d:=ogfDenom(l))+2]*(o:=1-x*d))[:len(d)+2],o)
+
 
 def nthTerm(denom,num,n,p=None): #see https://oeis.org/wiki/User:Natalia_L._Skirrow/linear_recurrence
     sm=modsum(p) if p else sum
@@ -65,16 +67,20 @@ def fibonacci(k): #not faster (in terms of arithmetic) than using nacci(2,k) lis
         d+=b**2
         (a,b)=(d,c+d) if k>>i&1 else (c,d)
     return(a)
-#nacci=lambda n,k: sum(map(lambda i: nacci(n,k-i),range(1,n+1))) if k>=n else k==n-1 #trivial and also no caching, Θ(output) complexity with respect to k
-#nacci=lambda n,k: k>=n-1 and (1 if k==n-1 else 1<<k-n if k<2*n else funcxp(lambda t: (sum(t),)+t[:-1],k+1-2*n)(tap((2).__pow__,revange(n)))[0]) #operations proportional to input; as bit lengths grow linearly with respect to iteration and only addition used, quadratic
+#nacci=lambda n,k: smp(lambda s: '1'*n not in str(bin(s)),range(1<<k-n)) if k>=n else k==n-1 #Θ(2**k) but nice interpretation to bear in mind
+#nacci=lambda n,k: smp(lambda i: nacci(n,k-i),range(1,n+1)) if k>=n else k==n-1 #trivial and also no caching, Θ(output) = Θ(φₙ**k)
+#nacci=lambda n,k: k>=n-1 and (1 if k==n-1 else 1<<k-n if k<2*n else funcxp(lambda t: (sum(t),)+t[:-1],k+1-2*n)(tap((2).__pow__,revange(n)))[0]) #Θ(k); as bit lengths grow linearly with respect to iteration and only addition used, becomes quadratic in k
 #nacci=lambda n,k: int(k>=n-1) and (1 if k==n-1 else 1<<k-n if k<2*n else matmul(matpow(((1,)*n,)+tap(lambda y: tap(lambda x: x==y,range(n)),range(n-1)),k+1-2*n),tap(lambda i: (1<<i,),revange(n)))[0][0]) #operations proportional to log(input), should be quasilinearish in log(k) assuming superpythonly efficient multiplication
 nacci=lambda n,k: int(k>=n-1) and nthTerm((1,)*n,(1,),k+1) #quasilinear instead of quadratic in n; nacci(1<<6,1<<14) takes 1.156s vs. 39.084s with previous
 nbonacci=nacci
-#nacciSum=lambda n,k: sum(map(lambda i: nbonacci(n,i),range(k)))
-#nacciSum=lambda n,k: (sum(map(lambda i: (1-i)*nbonacci(n,k+n-1-i),range(n)))-1)//(n-1)
+#nacciSum=lambda n,k: smp(lambda i: nbonacci(n,i),range(k))
+#nacciSum=lambda n,k: (smp(lambda i: (1-i)*nbonacci(n,k+n-1-i),range(n))-1)//(n-1)
 nacciSum=lambda n,k: int(k>=n-1) and nthTerm((2,)+(0,)*(n-1)+(-1,),(-1,),k+1)
 #subset_recolumnce_old=lambda n,k: n>=k and matmul(((1,)+(0,)*(k-1),),matpow(((-prod(map(lambda i: 1-i*x,range(1,k+1)))*x/x)[1:],)+tap(lambda y: tap(lambda x: x==y,range(k)),range(k-1)),n-k))[0][0] #O(k**c*log(n-k)) bigint operations, where c is matmul exp; much worse than explicit formula which is O(k)
 subset_recolumnce=lambda n,k: int(n>=k) and nthTerm(-prod(map(lambda i: 1-i*x,range(1,k+1)),x/x)[1:],(0,)*(k-1)+(1,),n-1) if k else not n #also now takes only polymul (instead of matmul) time in k as well as logarithmic in n; still much slower than standard subset(n,k) on all tests
+
+A318685=lambda n,k: smp(lambda i: choose(n,i,i-n+k)*frac(2)**i*frac(-3)**(2*n-2*i-k),range(n-k,n+1))
+stirlingtopeFvec=lambda d,k: (k==0)+(-1)**k*(nacci(2,2*k)-smp(lambda i: nacci(2,2*i)*A318685(d+1,k-i),range(1,k+1))) #from https://oeis.org/wiki/User:Natalia_L._Skirrow/Stirlingtopes; f-vector of dth Stirlingtope including the nullitope
 
 class polyfrac: #for representing rational functions as ordinary generating functions
     bracketate=lambda f,p: '('*bool(deg(p))+str(p)+')'*bool(deg(p))

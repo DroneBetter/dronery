@@ -11,6 +11,7 @@ from dronery.surd import*
 from dronery.matrix import*
 from dronery.poly import*
 from dronery.linRecur import*
+from dronery.numthy import*
 from dronery.perms import permutation
 
 
@@ -136,14 +137,6 @@ class hexer:
 
 #print(tap(lambda n: (lambda n,k: lexbin(n+1)[k])(*A002262(n,2)),range(16))) #A067576
 
-from sympy import integer_nthroot
-inthroot=lambda n,p: n and sgn(n)*(integer_nthroot(abs(n),p)[0] if p&p-1 else funcxp(isqrt,p.bit_length()-1)(abs(n)))
-icbrt=lambda n: inthroot(n,3)
-itsrt=lambda n: isqrt(sqrt(n)) #faster than inthroot(n,4)
-mootroot=(lambda b,n: (lambda i: (b%i**n,i))(inthroot(b,n))) #like moddiv (I think it will catch on)
-willian=lambda n: 1+sum(map(lambda i: (lambda r: r>0 and integer_nthroot(r,n)[0])(n//int(sum(map(lambda j: not((fact(j-1)+1)%j),range(1,i+1))))),range(1,2**n+1))) #willian(0)=1 (very suspicious)
-jones=lambda n: sum(map(lambda i: sum(map(lambda j: pow(fact(j),2,j+1),range(i)))<n,range(n*n.bit_length()+1))) #jones(0)=0 (what did Jones mean by this)
-
 
 modpolypow=lambda p,n,m: squow(p,n,lambda a,b: a*b%m)
 
@@ -166,7 +159,7 @@ def DELTA(R,S): #this implementation from https://oeis.org/wiki/User:Peter_Lusch
       if not n%r: return False
       if r>=ceilsqrt(n): return True
       r=nextprime(r)
-   return all(map(lambda a: squow(x-a,n,mul=lambda a,b: tap(lambda i: sum(map(lambda j: a[j]*b[(i-j)%r]%n,range(r))),range(r)))==x**(n%r)+-a%n,range(1,maxa+1))) #would be ntt.convolve(a,b,r,False,n) if r were a power of 2'''
+   return all(map(lambda a: squow(x-a,n,mul=lambda a,b: tap(lambda i: smp(lambda j: a[j]*b[(i-j)%r]%n,range(r)),range(r)))==x**(n%r)+-a%n,range(1,maxa+1))) #would be ntt.convolve(a,b,r,False,n) if r were a power of 2'''
 
 def sqrtmod(n,p): #Tonelli-Shanks
     assert legendreSymbol(n,p)==1,str(n)+' is not square mod '+str(p)
@@ -224,35 +217,8 @@ class polyomino:
     def __init__(b,width,pieces): b.w=width;b.p=pieces
     __repr__=lambda b: tap(,b.w)'''
 
-champernowne=lambda n: floor((10**((n+(10**(i:=ceil(W(log(10)/10**(1/9)*(n-1/9))/log(10)+1/9))-10)//9)%i-i+1)*((9*n+10**i+9*i-2)//(9*i)-1))%10) #https://oeis.org/A033307 (thank you David W. Cantrell)
+champernowne=A033307=lambda n: floor((10**((n+(10**(i:=ceil(W(log(10)/10**(1/9)*(n-1/9))/log(10)+1/9))-10)//9)%i-i+1)*((9*n+10**i+9*i-2)//(9*i)-1))%10) #https://oeis.org/A033307 (thank you David W. Cantrell)
 A120385=lambda n: int(n==1) or (lambda m,d: (1<<k|d)>>m)(*moddiv(n-((k:=int(W((n-2)*log(2)/2)/log(2))+1)-1<<k)-2,k+1)) #=lambda n: int(n==1) or (1<<(k:=int(W((n-2)*log(2)/2)/log(2))+1)|(n-(k-1<<k)-2)//(k+1))>>(n-(k-1<<k)-2)%(k+1)
-
-squarefree=lambda n: all(starmap(lambda p,e: e<2,factorise(n,1)))
-dirichmul=dirichletConvolve=lambda f,g: lambda n: sum(map(lambda d: f(d)*g(n//d),(1,)+factorise(n)))
-dirichlow=lambda f,n: squow(f,n-1,dirichmul,f) if n else compose((1).__eq__,int) #squow(f,n,dirichmul,(1).__eq__)#lambda f,n: reduce(lambda r,i: lambda n: dirichmul(r,f),range(n),id) #dirichlexponent
-class dirichlefy:
-    def __init__(d,f): d.f=f
-    __call__=lambda d,n: d.f(n)
-    __mul__=lambda a,b: dirichlefy(dirichmul(a,b))
-    __pow__=lambda f,n: dirichlefy((f**-1)**-n if n<-1 else Y(lambda g: lambda n: (1 if n==1 else frac(-sum(map(lambda d: f(n//d)*g(d),divisors(n)[:-1])),f(1)))) if n==-1 else dirichlow(f.f,n))
-d=dirichlefy
-
-legendreSymbol=lambda n,p: pow(n,p-1>>1,p)
-def jacobiSymbol(n,k): #Jacobi symbol, not Jacobi theta function or Jacobian matrix
-    #equals prod(starmap(lambda p,i: legendresymbol(n,p)**i,factorise(k,1))), however is not computed like this because factorisation is slow (instead by same recurrence relation as Euclid's gcd accelerated by cancelling powers of 2)
-    if n==1: return 1
-    if not n: return k==1
-    if not k&1: return 0
-    n%=k
-    res=1
-    while n:
-        n>>=(v:=val2(n))
-        if k&7 in (3,5): res*=(-1)**v
-        if n&3==3==k&3: res*=-1
-        n,k=k%n,n
-    return k==1 and res
-kroneckerSymbol=lambda n,k: gcd(n,k)==1 and (n==1 or k==1 or (jacobiSymbol(n,k) if k&1 else n&1 and (-1)**(n+1>>2&1)*(k==2 or kroneckerSymbol(n,k>>1))))
-#Kronecker generalises Jacobi, which generalises Legendre
 
 if __name__=='__main__':
     mode=18

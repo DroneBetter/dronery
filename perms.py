@@ -1,7 +1,8 @@
-#this section mostly explained in https://oeis.org/wiki/User:Nathan_L._Skirrow/Stirling_factoradics
+#this section mostly explained in https://oeis.org/wiki/User:Natalia_L._Skirrow/Stirling_factoradics
 #note that the default convention is colexicographic; 
 
 from dronery.common import*
+from dronery.poly import x
 from sympy import primerange
 
 def permutiterator(n): #uses Steinhaus-Johnson-Trotter; iterates through 'Gray code of permutations'
@@ -113,7 +114,7 @@ def radicPermuteInv(f,y):
     else:
       x=i;y=i-m
 
-def visualNicerm(f):
+def visualNicerm(f,col=None):
   n=len(f)
   horz=lap(lambda x: (x+1)*[None],range(n))
   vert=lap(lambda x: x*[None],range(n))
@@ -126,7 +127,7 @@ def visualNicerm(f):
         if upnesses[i]: vert[l[0]][l[1]]=i
         else: horz[l[0]][l[1]]=i
         lasers[i][upnesses[i]]+=1
-  strex=lambda c: str(hex(c))[2:]
+  strex=lambda c: (lambda s: s if col==None else colourate(*col[c],s))(str(hex(c))[2:] if len(f)<=16 else chr(0x61+c))
   print('\n'.join(map(lambda y: (''.join(map(lambda x: (strex(vert[x][y]) if y<x else ' ')+2*('/' if False and x==y else ' '),range(n)))+'\n' if y<n-1 else '')+''.join(map(lambda x: ('/' if not 0!=x-y!=f[x] else '+' if y<x else ' ')+2*(strex(horz[x][y]) if y<=x else ' '),range(n))),revange(n)))+'\n'+'  '.join(map(strex,range(n))))
 #visualNicerm(factoradic(20050415));exit()
 
@@ -140,6 +141,12 @@ def randPerm(n,k=None): #from East Side, West Side; can sample from cycle number
     west=randPerm(n-1,k)+[n-1]
     exchange(west,rn,-1)
     return west
+def permInd(p,n,k): #among the set of permutations with k cycles specifically
+  if not 0!=k!=n: return 0
+  if p[n-1]==n-1: return permInd(p[:-1],n-1,k-1)
+  else:
+    p[j:=p.index(n-1)]=p.pop()
+    return (n-2-j)*cycle(n-1,k)+cycle(n-1,k-1)+permInd(p,n-1,k)
 '''from random import randrange
 def randPerm(n,k=None,dbg=False):
   if k==None: return perm(factoradic(randrange(fact(n)),n))
@@ -192,12 +199,12 @@ class permutation:
   def __pow__(p,n):
     c=p.cycles()
     o=lap(lambda _: None,p)
-    for c in c:
-      for c,m in zip(c,c[(e:=(n:=n%(l:=len(c)))-l*(n>l>>1)):]+c[:e]): #very elegant I think
-        o[c]=m
+    for y in c:
+      for l,m in zip(y,y[(e:=n%(l:=len(y))):]+y[:e]):
+        o[l]=m
     return(permutation(o))
   comp=(lambda a,b: (a,permutation(b.internal+tuple(range(len(a)-len(b))))) if len(a)>=len(b) else permutation.comp(b,a)[::-1])
-  __eq__=(lambda a,b: __eq__(*map(tuple,permutation.comp(a,b))))
+  __eq__=(lambda a,b: tuple.__eq__(*map(tuple,permutation.comp(a,b))))
   __gt__=(lambda a,b: __gt__(*permutation.comp(a,b)))
   __lt__=(lambda a,b: __lt__(*permutation.comp(a,b)))
   __ge__=(lambda a,b: __ge__(*permutation.comp(a,b)))
@@ -216,19 +223,20 @@ class permutation:
     p.internal=(nicerm if nice else perm)(factoradic(t)) if type(t)==int else tuple(fromCycles(t) if t and isinstance(t[0],Iterable) else t)
   #various other things
   '''
-    __int__=(lambda p: sum(starmap(int.__mul__,enumerate(reversed(tuple(starmap(lambda i,t: t-sum(map(t.__gt__,p[:i])),enumerate(p)))),start=1))))
-    __int__=(lambda p: sum(starmap(int.__mul__,enumerate(starmap(lambda i,t: t-sum(map(t.__gt__,p[:i])),enumerate(p)),start=1))))
-    __int__=(lambda p: sum(map(int.__mul__,reversed(tuple(starmap(lambda i,t: t-sum(map(t.__gt__,p[:i])),enumerate(p)))),redumulate(int.__mul__,range(len(p)),1))))
-    __int__=(lambda p: sum(map(int.__mul__,starmap(lambda i,t: t-sum(map(t.__gt__,p[:i])),enumerate(dbg(p))),redumulate(int.__mul__,range(1,len(p))))))
-    __int__=(lambda p: sum(map(int.__mul__,reversed(tuple(starmap(lambda i,t: t-sum(map(t.__gt__,p[:i])),enumerate(dbg(p))))),redumulate(int.__mul__,range(1,len(p))))))
-    __int__=(lambda p: sum(map(int.__mul__,starmap(lambda i,t: t-sum(map(t.__gt__,p[:i])),enumerate(dbg(p))),redumulate(int.__floordiv__,range(len(p),2),fact(len(p)))))) #produces sequence of palindromes, (0,2,0,12,6,12,0,24,0,72,24,72,0,48,0,72,48,72,24,48,24,72,48,72,0,120,0,240,120,240,0) (very suspicious)
-    __int__=(lambda p: sum(map(int.__mul__,starmap(lambda i,t: t-sum(map(i.__gt__,map(p.index,range(i)))),enumerate(dbg(p))),redumulate(int.__floordiv__,range(len(p),2),fact(len(p)))))) #also palindromes
-    __int__=(lambda p: sum(map(int.__mul__,starmap(lambda i,t: t+~sum(map(i.__lt__,map(p.index,range(i)))),enumerate(dbg(p))),redumulate(int.__floordiv__,range(len(p),1),fact(len(p)))))) #very suspicious non-palindromic sequence of alternating sign
-    __int__=(lambda p: sum(map(int.__mul__,starmap(lambda i,t: t+1-sum(map(t.__gt__,p[i+1:])),enumerate(dbg(p))),redumulate(int.__floordiv__,range(len(p),2),fact(len(p)))))) #A048765
-    __int__=(lambda p: sum(map(int.__mul__,starmap(lambda i,t: t+1-sum(map(t.__gt__,p[:i])),enumerate(dbg(p))),redumulate(int.__floordiv__,range(len(p),2),fact(len(p)))))) #weird Thue-Morse-like thing
-    __int__=(lambda p: sum(map(int.__mul__,starmap(lambda i,t: t-sum(map(i.__lt__,map(p.index,range(i)))),enumerate(dbg(p))),redumulate(int.__floordiv__,range(len(p)-1,0,-1),fact(len(p)-1)))))'''
-  #__int__=lambda p: reduce(lambda r,i: (r[0]+(len(p)+~(i[1]+sum(map(i[1].__lt__,r[1]))))*fact(len(p)+~i[0]),r[1]+(i[1],)),enumerate(p[:0:-1]),(0,()))[0]
+    __int__=(lambda p: sum(starmap(int.__mul__,enumerate(reversed(tuple(starmap(lambda i,t: t-smp(t.__gt__,p[:i]),enumerate(p)))),start=1))))
+    __int__=(lambda p: sum(starmap(int.__mul__,enumerate(starmap(lambda i,t: t-smp(t.__gt__,p[:i]),enumerate(p)),start=1))))
+    __int__=(lambda p: smp(int.__mul__,reversed(tuple(starmap(lambda i,t: t-smp(t.__gt__,p[:i]),enumerate(p)))),redumulate(int.__mul__,range(len(p)),1)))
+    __int__=(lambda p: smp(int.__mul__,starmap(lambda i,t: t-smp(t.__gt__,p[:i]),enumerate(dbg(p))),redumulate(int.__mul__,range(1,len(p)))))
+    __int__=(lambda p: smp(int.__mul__,reversed(tuple(starmap(lambda i,t: t-smp(t.__gt__,p[:i]),enumerate(dbg(p))))),redumulate(int.__mul__,range(1,len(p)))))
+    __int__=(lambda p: smp(int.__mul__,starmap(lambda i,t: t-smp(t.__gt__,p[:i]),enumerate(dbg(p))),redumulate(int.__floordiv__,range(len(p),2),fact(len(p))))) #produces sequence of palindromes, (0,2,0,12,6,12,0,24,0,72,24,72,0,48,0,72,48,72,24,48,24,72,48,72,0,120,0,240,120,240,0) (very suspicious)
+    __int__=(lambda p: smp(int.__mul__,starmap(lambda i,t: t-smp(i.__gt__,map(p.index,range(i))),enumerate(dbg(p))),redumulate(int.__floordiv__,range(len(p),2),fact(len(p))))) #also palindromes
+    __int__=(lambda p: smp(int.__mul__,starmap(lambda i,t: t+~smp(i.__lt__,map(p.index,range(i))),enumerate(dbg(p))),redumulate(int.__floordiv__,range(len(p),1),fact(len(p))))) #very suspicious non-palindromic sequence of alternating sign
+    __int__=(lambda p: smp(int.__mul__,starmap(lambda i,t: t+1-smp(t.__gt__,p[i+1:]),enumerate(dbg(p))),redumulate(int.__floordiv__,range(len(p),2),fact(len(p))))) #A048765
+    __int__=(lambda p: smp(int.__mul__,starmap(lambda i,t: t+1-smp(t.__gt__,p[:i]),enumerate(dbg(p))),redumulate(int.__floordiv__,range(len(p),2),fact(len(p))))) #weird Thue-Morse-like thing
+    __int__=(lambda p: smp(int.__mul__,starmap(lambda i,t: t-smp(i.__lt__,map(p.index,range(i)))),enumerate(dbg(p)),redumulate(int.__floordiv__,range(len(p)-1,0,-1),fact(len(p)-1))))'''
+  #__int__=lambda p: reduce(lambda r,i: (r[0]+(len(p)+~(i[1]+smp(i[1].__lt__,r[1])))*fact(len(p)+~i[0]),r[1]+(i[1],)),enumerate(p[:0:-1]),(0,()))[0]
   __int__=lambda p,nice=0: unfactoradic((unnicerm if nice else unperm)(p))
+  __hash__=__int__
 
   def cycles(p,o=0): #(idea to use sets is from https://stackoverflow.com/a/75823973 :-)
     #len(cycles)          if o==2 else
@@ -255,7 +263,7 @@ class permutation:
   sgn=lambda *p: (-1)**parity(*p)
 
 #fromCycles=lambda c: permutation(reduce(lambda r,i: r+(lambda t: t and (t[-1],)+t[:-1])(tuple(range(l:=r[-1]+1 if r else 0,l+i))),c,())) #for representatives
-fromCycles=lambda c: fromCycles(*c) if isinstance(c[0][0],Iterable) else reduce(lambda p,c: reduce(lambda p,i: p[:i[0]]+(i[1],)+p[i[0]+1:],zip(c,chain(c[1:],(c[0],))),p),c,tuple(range(sum(map(len,c)))))
+fromCycles=lambda c: fromCycles(*c) if isinstance(c[0][0],Iterable) else reduce(lambda p,c: reduce(lambda p,i: p[:i[0]]+(i[1],)+p[i[0]+1:],zip(c,chain(c[1:],(c[0],))),p),c,tuple(range(smp(len,c))))
 
 def floorctorial(n,i=False): #floorctorial(n)=fact(invfact(n))
   k=1;a=1
@@ -282,8 +290,8 @@ shifty=(lambda n,i=False: tap(((lambda n: int(permutation(n)**-1)) if i else per
 permorials=(lambda n,r=False: tap(int,redumulate(lambda n,k: __mul__(*(n,permutation(k))[::(-1)**r]),range(1,n),permutation(0)))) #like factorials (...4*3*2*1 if r else 1*2*3*4...) but with permutation composition as the multiplication method
 #print('\n'.join(map(lambda r: str(permorials(fact(5),r)),range(2))));exit() #(neither is in the OEIS :-)
 
-#see https://conwaylife.com/wiki/User:DroneBetter/miscellaneous_curiosities#permutation_inequalities or https://oeis.org/wiki/User:Nathan_L._Skirrow/bitwise_permutations
-#A368070=lambda n: sum(map(lambda p: all(tarmap(lambda i,p: __gt__(*p)==n>>i&1,enumerate(pairwise(permutation(p)[:n.bit_length()+1])))),range(fact(n.bit_length()+1)))) #trivial
+#see https://conwaylife.com/wiki/User:DroneBetter/miscellaneous_curiosities#permutation_inequalities or https://oeis.org/wiki/User:Natalia_L._Skirrow/bitwise_permutations
+#A368070=lambda n: smp(lambda p: all(tarmap(lambda i,p: __gt__(*p)==n>>i&1,enumerate(pairwise(permutation(p)[:n.bit_length()+1])))),range(fact(n.bit_length()+1))) #trivial
 A368070=lambda n: sum(reduce(lambda r,k: tap(lambda i: sum(r[:i] if n>>k&1 else r[i:]),range(k+2)),range(n.bit_length()),(1,0)))
 '''def A368070(n):
   m=0
@@ -303,46 +311,69 @@ inte=lambda p: [0]+[frac(c,i+1) for i,c in enumerate(p)]
     r=i if n>>k&1 else [sum(i)]+[-c for c in i[1:]]
   return int(fact(n.bit_length()+1)*sum(inte(r)))'''
 A060351=lambda n: A368070(n&~(1<<n.bit_length()-1)) if n<<2>>n.bit_length()&1 else A368070(2**n.bit_length()+~n)
-runMultinomial=lambda n: fact(n.bit_length())//prod(map(lambda n: fact(len(list(n[1]))),groupby(bin(n)[2:],key=None)))
+rlefactprod=lambda n: prod(map(lambda n: fact(len(list(n[1]))),groupby(bin(n)[2:],key=None)))
+rlenomial=lambda n: fact(n.bit_length())//rlefactprod(n)
 
 
-#print(stratrix(tap(lambda n: tarmap(lambda k,c: (sum(map(lambda i: cycle(n,n-k+i)*(-x)**i,range(k+1))),fit(*tap(lambda d: sum(map(lambda i: i[d]==0,c[1])),range(n)))),enumerate(reversed(sortle(tap(lambda f: factoradic(f,n),range(fact(n))),key=lambda p: permutation(nicerm(p,n)).cycles(2),length=0)))),range(1,8)),dims=2))
+#print(stratrix(tap(lambda n: tarmap(lambda k,c: (smp(lambda i: cycle(n,n-k+i)*(-x)**i,range(k+1)),fit(*tap(lambda d: smp(lambda i: i[d]==0,c[1]),range(n)))),enumerate(reversed(sortle(tap(lambda f: factoradic(f,n),range(fact(n))),key=lambda p: permutation(nicerm(p,n)).cycles(2),length=0)))),range(1,8)),dims=2))
 
 if __name__=='__main__':
-  #print(','.join(map(lambda n: str(cycles(permutation(n),True)),range(16))))
-  a=b=()
-  for n in count():
-    b+=tap(lambda k: int(permutation(k)),((lambda f: range(f,f*n))(fact(n-1)) if n else (0,)))
-    print(b)
-    #print(n,rle(sorted(map(lambda k: permutation(k).cycles(True),((lambda f: range(f,f*n))(fact(n-1)) if n else (0,))))))
-    a=tarmap(int.__add__,zip_longest(a,(lambda s: tap(s.count,range(A000793(n)+1)))(sorted(map(lambda k: permutation(k).cycles(True),((lambda f: range(f,f*n))(fact(n-1)) if n else (0,))))),fillvalue=0)) #A057731
-    #print(str(n)+':',','.join(map(str,a))+',')
-    #print(str(n)+':',','.join(map(lambda r: str(r[1]),rle(sorted(map(lambda k: permutation(k).cycles(True),range(fact(n)))))))+',') #rle version of above sequence, so forgoing 0s (not very interesting)
-    #print(str(n)+':',str(max(map(lambda k: permutation(k).cycles(True),((lambda f: range(f,f*n))(fact(n-1)) if n else (0,))),default=0))+',') #A000793
-    #print(n,lcm(*map(lambda k: permutation(k).cycles(True),((lambda f: range(f,f*n))(fact(n-1)) if n else (0,)))))
-    if n>4:
-      break
+  if testing:=0:
+    #print(','.join(map(lambda n: str(cycles(permutation(n),True)),range(16))))
+    a=b=()
+    for n in count():
+      b+=tap(lambda k: int(permutation(k)),((lambda f: range(f,f*n))(fact(n-1)) if n else (0,)))
+      print(b)
+      #print(n,rle(sorted(map(lambda k: permutation(k).cycles(True),((lambda f: range(f,f*n))(fact(n-1)) if n else (0,))))))
+      a=tarmap(int.__add__,zip_longest(a,(lambda s: tap(s.count,range(A000793(n)+1)))(sorted(map(lambda k: permutation(k).cycles(True),((lambda f: range(f,f*n))(fact(n-1)) if n else (0,))))),fillvalue=0)) #A057731
+      #print(str(n)+':',','.join(map(str,a))+',')
+      #print(str(n)+':',','.join(map(lambda r: str(r[1]),rle(sorted(map(lambda k: permutation(k).cycles(True),range(fact(n)))))))+',') #rle version of above sequence, so forgoing 0s (not very interesting)
+      #print(str(n)+':',str(max(map(lambda k: permutation(k).cycles(True),((lambda f: range(f,f*n))(fact(n-1)) if n else (0,))),default=0))+',') #A000793
+      #print(n,lcm(*map(lambda k: permutation(k).cycles(True),((lambda f: range(f,f*n))(fact(n-1)) if n else (0,)))))
+      if n>4:
+        break
 
-  print('\n'.join(map(lambda n: str(permutation(n)),range(16))))
-  print(tap(lambda n: permutation(n).order(),range(16)))
-  print(tap(lambda n: A002262(n,True),range(16)))
-  #print(tap(permutation,range(16)))
-  print(tap(lambda n: int(permutation.__mul__(*map(permutation,A002262(n,True)))),range(16)))
-  print(tap(lambda n: int(permutation.__mul__(*map(permutation,reversed(A002262(n,True))))),range(16)))
-  print(tap(lambda n: int(permutation(n)**-1),range(16))) #A056019
+    print('\n'.join(map(lambda n: str(permutation(n)),range(16))))
+    print(tap(lambda n: permutation(n).order(),range(16)))
+    print(tap(lambda n: A002262(n,True),range(16)))
+    #print(tap(permutation,range(16)))
+    print(tap(lambda n: int(permutation.__mul__(*map(permutation,A002262(n,True)))),range(16)))
+    print(tap(lambda n: int(permutation.__mul__(*map(permutation,reversed(A002262(n,True))))),range(16)))
+    print(tap(lambda n: int(permutation(n)**-1),range(16))) #A056019
 
 
-  '''testNicerm=lambda f: lap(lambda x: radicPermute(f,x),range(len(f)))
-  testNicermInv=lambda f: lap(lambda x: radicPermuteInv(f,x),range(len(f)))''' #yup both equivalent
-  #print(stratrix(tap(lambda n: permutation(perm(factoradic(n))),range(fact(4))),dims=2,keepzero=1))
-  #print(stratrix(tap(lambda n: permutation(nicerm(factoradic(n))),range(fact(4))),dims=2,keepzero=1));exit()
-  import matplotlib.pyplot as plot
-  #print(tap(lambda n: unfactoradic(unperm(nicerm(factoradic(n)))),range(fact(7))))
-  #print(t:=tap(lambda n: unfactoradic(unnicerm(nicerm(factoradic(n)))),range(fact(7))))
-  #print(t:=tap(lambda n: unfactoradic(unnicermInv(nicermInv(factoradic(n)))),range(fact(7))))
-  print(t:=tap(lambda n: unfactoradic(unperm(nicerm(factoradic(n)))),range(fact(7))))
-  print(t:=tap(lambda n: Y(lambda f: lambda i,p: min(i) if i and p==n else f(i+(p,),unfactoradic(unperm(nicerm(factoradic(p))))))((),n),range(fact(6))))
-  plot.scatter(range(len(t)),t,s=4);plot.show()
-  #print(stratrix(tap(lambda n: unfactoradic(fastUnperm(permutation(perm(factoradic(n))).Inv())),range(fact(5))),dims=1,keepzero=1))
-  #print(stratrix(tap(lambda n: tap((1).__add__,nicerm(factoradic(n))),range(fact(5))),dims=2,keepzero=1))
-  #print(stratrix(tap(lambda n: ((f:=factoradic(n))[::-1],p:=permutation(nicerm(f)),len(p)-len(p.cycles())),range(1,fact(5))),dims=2))
+    '''testNicerm=lambda f: lap(lambda x: radicPermute(f,x),range(len(f)))
+    testNicermInv=lambda f: lap(lambda x: radicPermuteInv(f,x),range(len(f)))''' #yup both equivalent
+    #print(stratrix(tap(lambda n: permutation(perm(factoradic(n))),range(fact(4))),dims=2,keepzero=1))
+    #print(stratrix(tap(lambda n: permutation(nicerm(factoradic(n))),range(fact(4))),dims=2,keepzero=1));exit()
+    import matplotlib.pyplot as plot
+    #print(tap(lambda n: unfactoradic(unperm(nicerm(factoradic(n)))),range(fact(7))))
+    #print(t:=tap(lambda n: unfactoradic(unnicerm(nicerm(factoradic(n)))),range(fact(7))))
+    #print(t:=tap(lambda n: unfactoradic(unnicermInv(nicermInv(factoradic(n)))),range(fact(7))))
+    print(t:=tap(lambda n: unfactoradic(unperm(nicerm(factoradic(n)))),range(fact(7))))
+    print(t:=tap(lambda n: Y(lambda f: lambda i,p: min(i) if i and p==n else f(i+(p,),unfactoradic(unperm(nicerm(factoradic(p))))))((),n),range(fact(6))))
+    plot.scatter(range(len(t)),t,s=4);plot.show()
+    #print(stratrix(tap(lambda n: unfactoradic(fastUnperm(permutation(perm(factoradic(n))).Inv())),range(fact(5))),dims=1,keepzero=1))
+    #print(stratrix(tap(lambda n: tap((1).__add__,nicerm(factoradic(n))),range(fact(5))),dims=2,keepzero=1))
+    #print(stratrix(tap(lambda n: ((f:=factoradic(n))[::-1],p:=permutation(nicerm(f)),len(p)-len(p.cycles())),range(1,fact(5))),dims=2))
+  else: #mirror game
+    n=16;pi=randrange(fact(n))
+    #pi=20050415;n=invfact(pi)
+    n+=fact(n)<pi
+    f=factoradic(pi)
+    #p=permutation(pi,nice=1)(range(n))
+    randCol=lambda: tap(lambda _: randrange(6),range(3))
+    colours=lap(lambda i: randCol(),range(n))
+
+    if n<=3**3:
+      while True:
+        shuffle(s:=list(subsets(range(len(colours)),2)))
+        for i,j in s:
+          c,d=tap(colours.__getitem__,(i,j))
+          if all(map(lambda a,b: abs(a-b)<=1,c,d)):
+            colours[i if randrange(2) else j]=randCol()
+            break
+        else: break
+    print(''.join(starmap(lambda i,c: colourate(*c,chr(0x61+i)),enumerate(colours))))
+    visualNicerm(f,colours)
+  
