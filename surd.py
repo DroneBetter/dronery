@@ -1,6 +1,10 @@
 from dronery.common import reduce,shortduce,sgn,gcd,lcm,frac,inthroot,lap,starmap,smp,product
 from operator import __add__,__neg__,__sub__,__mul__,__floordiv__,__truediv__,__eq__,__or__,__gt__
-nicediv=lambda a,b,fracMode=True: a/b if type(a) in (s:={float,surd}) or type(b) in s else ((frac if fracMode else __truediv__) if a%b else __floordiv__)(a,b) #remain integer if possible
+def nicediv(a,b,fracMode=True):
+    try: return a.__nicediv__(b)
+    except: return a/b if type(a) in (s:={float,surd}) or type(b) in s else ((frac if fracMode else __truediv__) if a%b else __floordiv__)(a,b) #remain integer if possible
+    '''i do not recommend continuing to use this since (if a is int and b contains fracs) tap(a.__mul__,b) returns NotImplementedType, which is Difficult to trace down the error from because it fails silently
+    '''
 rnicediv=lambda b,frac=True: lambda a: nicediv(a,b,frac)
 
 def stractorise(struc,inds): #structure factorise

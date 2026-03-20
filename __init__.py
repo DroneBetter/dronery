@@ -124,16 +124,17 @@ class hexer:
        (0,1) (1,1) (2,1) (3,1)     3 4 5 6
           (0,0) (1,0) (2,0)         0 1 2'''
     #row widths are tuple(range+1+y for y in range(range+1))+tuple(range*2-y for y in range(range))
-    __iter__=(lambda h: ((x,y) for y in range(2*h.r+1) for x in (range(h.r+1+y) if y<=h.r else range(y-h.r,2*h.r+1))))
-    __index__=(lambda h,c: (lambda x,y: (y*(y+2*h.r+1)>>1 if y<=h.r else (h.r+1)*(3*h.r+2)+(y-h.r-1)*(5*h.r-y)>>1)+x)(*c))
+    __iter__=lambda h: ((x,y) for y in range(2*h.r+1) for x in (range(h.r+1+y) if y<=h.r else range(y-h.r,2*h.r+1)))
+    __index__=lambda h,c: (lambda x,y: (y*(y+2*h.r+1)>>1 if y<=h.r else (h.r+1)*(3*h.r+2)+(y-h.r-1)*(5*h.r-y)>>1)+x)(*c)
     #print(tuple(((x,y),h.index(x,y)) for y in range(2*h.r+1) for x in (range(h.r+1+y) if y<=h.r else range(y-h.r,2*h.r+1))),len(tuple(1 for y in range(2*h.r+1) for x in (range(h.r+1+y) if y<=h.r else range(y-h.r,2*h.r+1)))),3*h.r*(h.r+1)+1)
     #sum(1 for y in range(h.r+1) for x in (range(h.r+1+y)))=∑_{y=0}^{h.r} (∑_{x=0}^{h.r+y} (1))=(h.r+1)*(3*h.r+2)//2
     #(1 for y in range(h.r+2,2*h.r+1) for x in (range(y-h.r,2*h.r+1)))=∑_{y=h.r+2}^{y} (∑_{x=y-h.r}^{2*h.r} (1))=(y-h.r-1)*(5*h.r-y)//2, i=(y-h.r-1)*(5*h.r-y)//2+(h.r+1)*(3*h.r+2)//2
     #print(tuple(h.index(x,y) for y in range(2*h.r+1) for x in (range(h.r+1+y) if y<=h.r else range(y-h.r,2*h.r+1))))
     #print(tuple(len(tuple(1 for y in range(2*h.r+1) for x in (range(h.r+1+y) if y<=h.r else range(y-h.r,2*h.r+1)))) for h.r in range(8)))
-    __getitem__=(lambda h,i: (lambda y: (i-y*(y+2*h.r+1)//2,y))((isqrt(8*i+(1+2*h.r)**2)-1)//2-h.r) if i<(h.r+1)*(3*h.r+2)>>1 else (lambda y: (i+1-((h.r+1)*(3*h.r+2)+(y-h.r-1)*(5*h.r-y))//2,y))(3*h.r+(3-ceilsqrt(9-8*i+28*h.r*(1+h.r)))//2))
+    __getitem__=lambda h,i: (lambda y: (i-y*(y+2*h.r+1)//2,y))((isqrt(8*i+(1+2*h.r)**2)-1)//2-h.r) if i<(h.r+1)*(3*h.r+2)>>1 else (lambda y: (i+1-((h.r+1)*(3*h.r+2)+(y-h.r-1)*(5*h.r-y))//2,y))(3*h.r+(3-ceilsqrt(9-8*i+28*h.r*(1+h.r)))//2)
     #print(tap(h.__getitem__,range(len(h))))
     #print(tuple(((x,y),h[i]) for i,(x,y) in enumerate(coords(h.r))))
+    __contains__=lambda h,c: (lambda x,y: 0<=x<=r<=y>=0 and -r<=y-x<=r and x)(*c)
 
 #print(tap(lambda n: (lambda n,k: lexbin(n+1)[k])(*A002262(n,2)),range(16))) #A067576
 

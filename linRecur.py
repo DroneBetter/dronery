@@ -67,12 +67,14 @@ def fibonacci(k): #not faster (in terms of arithmetic) than using nacci(2,k) lis
         d+=b**2
         (a,b)=(d,c+d) if k>>i&1 else (c,d)
     return(a)
+fib=fibonacci
 #nacci=lambda n,k: smp(lambda s: '1'*n not in str(bin(s)),range(1<<k-n)) if k>=n else k==n-1 #Θ(2**k) but nice interpretation to bear in mind
 #nacci=lambda n,k: smp(lambda i: nacci(n,k-i),range(1,n+1)) if k>=n else k==n-1 #trivial and also no caching, Θ(output) = Θ(φₙ**k)
 #nacci=lambda n,k: k>=n-1 and (1 if k==n-1 else 1<<k-n if k<2*n else funcxp(lambda t: (sum(t),)+t[:-1],k+1-2*n)(tap((2).__pow__,revange(n)))[0]) #Θ(k); as bit lengths grow linearly with respect to iteration and only addition used, becomes quadratic in k
 #nacci=lambda n,k: int(k>=n-1) and (1 if k==n-1 else 1<<k-n if k<2*n else matmul(matpow(((1,)*n,)+tap(lambda y: tap(lambda x: x==y,range(n)),range(n-1)),k+1-2*n),tap(lambda i: (1<<i,),revange(n)))[0][0]) #operations proportional to log(input), should be quasilinearish in log(k) assuming superpythonly efficient multiplication
 nacci=lambda n,k: int(k>=n-1) and nthTerm((1,)*n,(1,),k+1) #quasilinear instead of quadratic in n; nacci(1<<6,1<<14) takes 1.156s vs. 39.084s with previous
 nbonacci=nacci
+trib=tribonacci=lambda k: nacci(3,k)
 #nacciSum=lambda n,k: smp(lambda i: nbonacci(n,i),range(k))
 #nacciSum=lambda n,k: (smp(lambda i: (1-i)*nbonacci(n,k+n-1-i),range(n))-1)//(n-1)
 nacciSum=lambda n,k: int(k>=n-1) and nthTerm((2,)+(0,)*(n-1)+(-1,),(-1,),k+1)
@@ -86,7 +88,7 @@ class polyfrac: #for representing rational functions as ordinary generating func
     bracketate=lambda f,p: '('*bool(deg(p))+str(p)+')'*bool(deg(p))
     __repr__=lambda f: f.bracketate(f.a)+'/'+f.bracketate(f.b)
     __bool__=lambda f: bool(f.num)
-    def __init__(f,a,b=None,frac=True,cache=True):
+    def __init__(f,a,b=None,frac=True,cache=True,de_gcd=True):
         f.cache=cache
         if type(a)==polyfrac:
             f.a,f.b=a.a,a.b
@@ -103,8 +105,9 @@ class polyfrac: #for representing rational functions as ordinary generating func
                 else:
                     b=1
             (f.a,f.b)=map(lambda n: polynomial(n) if isinstance(n,Iterable) else (n,),(a,b))
-        g=polynomial.gcd(polynomial(f.a),polynomial(f.b));f.a/=g;f.b/=g
-        g=gcd(tuple(polynomial(f.a))+tuple(polynomial(f.b)))*sgn(polynomial(f.b)[0]);f.a/=g;f.b/=g
+        if de_gcd:
+            g=polynomial.gcd(polynomial(f.a),polynomial(f.b));f.a/=g;f.b/=g
+            g=gcd(tuple(polynomial(f.a))+tuple(polynomial(f.b)))*sgn(polynomial(f.b)[0]);f.a/=g;f.b/=g
         '''(fa,fb)=tap(factorise,(f.a,f.b))
         for a in fa:
             if a in fb:

@@ -1,7 +1,7 @@
 from dronery.common import*
 from dronery.surd import nicediv,surd
 from dronery.ntt import fixlen
-from dronery.matrix import mat,matmul,inverse,charpoly,reduceRowEchelon
+from dronery.matrix import mat,matmul,inverse,chartuple,reduceRowEchelon,augment,deaugment,idmat,dbgatrix
 from operator import __add__,__neg__,__sub__,__mul__,__floordiv__,__truediv__,__eq__,__or__,__gt__
 
 def shed(f,l,i): #like a snake, not a garden building
@@ -26,15 +26,26 @@ sup=lambda i,supss=True: ''.join(map(lambda n: sups[int(n)],str(i))) if supss el
 desup=lambda s: ''.join(map(lambda s: '**'+''.join(map(compose(sups.index,str),s)) if s[0] in sups else s,Y(lambda f: lambda t,s,m,i: (f(t+(s[:i],),s[i:],not m,0) if (g:=s[i] in sups)!=m and (t or i) else f(t,s,g,i+1)) if i<len(s) else t+bool(s)*(s,))((),s,False,0)))
 denom=lambda p: lcm(*map(denom,p)) if isinstance(p,Iterable) else p.denominator if type(p)==frac else 1
 
+bell=lambda n: smp(lambda k: subset(n,k),range(n+1))
+touchard=lambda n: polynomial(tap(lambda k: subset(n,k),range(n+1)))
+#touchard=lambda n: polynomial(Y(lambda f: lambda k,p,o: o if k>n else f(k+1,(md:=moddiv(p,x-k))[1],o+(md[0][0],)))(2,polynomial((1,)*(n-1)),(0,1))) #very slow and bad
+touchard=lambda n: polynomial(Y(lambda f: lambda k,p,o: o if k>n else f(k+1,(md:=Y(lambda f: lambda p,d: (p[0],d) if len(p)==1 else f((p[1]+k*p[0],)+p[2:],d+(p[0],)))(p,()))[1],o+(md[0],)))(1,(1,)+(0,)*(n-1),(0,))) #beats out other one for n>(about 512); from https://scholars.iwu.edu/ws/portalfiles/portal/39727279/fulltext.pdf
+subbell=lambda n: smp(lambda k: choose(~k,~n)*bell(k),range(n+1))
+#Bell polynomials; copying SymPy for now
+bellY=lambda n,k,x: sum(starmap(lambda m,c: x[m]*c*bellY(n+~m,k-1,x[:n-k-m+1]),enumerate(redumulate(lambda c,m: c*(n+~m)/(m+1),range(n-k),frac(1))))) if n and k else not (n or k) #mth value of c is choose(n-1,m) #à la Mathematica's name; conventionally the 'partial/incomplete Bell polynomials'
+bellM=lambda n,x: smp(lambda k: bellY(n,k,x[:n-k+1]),range(n+1)) #M for multivariate
+#note that the Y polynomials of Riordan are actually the M polynomials here
+
 bernoulli=lru_cache(lambda n,x=0: (1,x-frac(1,2))[n] if n<2 else (x or ~n&1) and smp(lambda k: choose(n,k)*bernoulli(n-k)*x**k,range(n+1)) if x else smp(lambda k: frac(choose(n,k),k+~n)*bernoulli(k),range(n))) #x determines whether upper-inclusive (may make bernoulli polynomial function next) #non-recursive form: lambda n: smp(lambda k: frac(smp(lambda r: (-1)**r*choose(k,r)*r**n,range(k+1)),k+1),range(n+1))
 ordinoulli=lambda n,x=1: bernoulli(n,x)*fact(n)
 gregory=lru_cache(lambda n: smp(lambda k: frac((-1)**k,k)*gregory(n+1-k),range(2,n+2)) if n else 1)
 subsetWard=lambda n,k: subset2(n+k,k)
 '''
 Nørlund ("generalised Bernoulli") numbers
-#B_n^{(r)} = [x^n/n!](x/(e^x-1))^r
+#norlund(n,r) = B_n^{(r)} = [x^n/n!](x/(e^x-1))^r
 #see p. 16 of https://arxiv.org/abs/2504.16965
 #equals frac((-1)**n*cycle(r,r-n),choose(r-1,n)) but allows evaluation for n>=r also
+#that is, cycDiag=lambda k,n: (-1)**k*norlund(k,n)*choose(n-1,k) would be cycle(n,n-k)
 '''
 #norlund=lambda n,r: smp(lambda k: (-1)**k*subset(n,k)*smp(lambda l: choose(r,l)*smp(lambda m: choose(~m,~l)*frac(cycle(k+m,m),choose(k+m,m)),range(l+1)),range(k+1)),range(n+1)) #this is that paper's theorem 9 (very suspicious)
 norlund=lambda n,r: smp(lambda k: (-1)**k*subset(n,k)*frac(cycle(k+r,r),choose(k+r,r)),range(n+1)) #known prior to Kruchinin in sequences like A191577
@@ -46,14 +57,15 @@ def norlundPolys(r,deg): #tuple of Nørlund polynomials (B_0^{(r)}(x),...,B_{deg
     return tap(lambda m: polynomial(lap(lambda a: Ar[m-a]/fact(a),range(m+1)))*fact(m),range(deg))
 #allows for cool things like https://math.stackexchange.com/a/5108126;
 #>>> r=3;print(stratrix(tap(lambda m: tap(lambda n: stratrix((smp(lambda k: choose(n+r-1-k,r-1)*k**m,range(1,n+1)),frac(fact(m),fact(m+r))*norlundPoly(m+r,r)(n+r)-smp(lambda i: (-1)**(m+r-i)*multichoose(n,i)*frac(fact(m),fact(m+r-i))*norlund(m+r-i,r-i),range(r)))),range(8)),range(8)),dims=2))
+norlundB=lambda n,r,x=None: norlund(n,r) if x==None else norlundPoly(n,r)(x) #equivalent to Mathematica's NorlundB
 
 class polynomial:
     def __init__(p,*l):
         p.internal=tuple(charpoly(l[0])) if type(l[0])==mat else tuple(reduce(polynomial.__mul__,l[0])) if type(l[0])=='polyprod' else sum(starmap(lambda i,c: c*chooseby(i),enumerate(l[0]))) if type(l[0])==polychoose else l[0].internal if type(l[0])==polynomial else (lambda t: t[:len(t)-next(filter(t[::-1].__getitem__,range(len(t))))] if any(t) else (0,))(tuple(l[0]) if len(l)==1 and isinstance(l[0],Iterable) else tuple(l)) #do not add  (too many problems)
     valx=lambda p: next(filter(p.__getitem__,range(len(p))),0)
     __iter__=lambda p: iter(p.internal)
-    __call__=lambda p,x: sum(starmap(lambda i,c: c*x**i,enumerate(p)))
-    __repr__=lambda p,sups=True,x='x',frac=True: (lambda de,t: '('*(t!=1!=de)+(''.join(starmap(lambda i,c: (lambda n,d: bool(n)*(('-' if type(n)!=polynomial and sgn(n)==-1 else '+'*any(p[:i]))+('('+str(n)+')' if type(n)==polynomial else str(abs(n))*(abs(n)!=1 or not i))+'*'*(i and (type(n)==polynomial or abs(n)!=1))+(x+sup(i,sups)*(i>1))*bool(i)+(d!=1)*('/'+str(d))))(*((int(de*c),1) if frac else (c.numerator,c.denominator) if type(c)==Fraction else (c,1))),enumerate(p))) if t else '0')+(')'*(t!=1)+'/'*(1+(0 and not gcd(p)%1))+str(de))*(1!=de))(denom(p) if frac else 1,smp(bool,p))
+    __call__=lambda p,x: reduce(lambda r,c: (r[0]*x,r[1]+c*r[0]),p,(idmat(l:=len(x)),mat(((0,)*l,)*l)))[1] if type(x)==mat else sum(starmap(lambda i,c: c*x**i,enumerate(p)))
+    __repr__=lambda p,sups=True,x='x',frac=True: (lambda de,t: '('*(t!=1!=de)+(''.join(starmap(lambda i,c: (lambda n,d: bool(n)*(('-' if type(n)!=polynomial and sgn(n)==-1 else '+'*any(p[:i]))+('('+str(n)+')' if type(n)==polynomial else str(abs(n))*(abs(n)!=1 or not i))+'*'*(i and (type(n)==polynomial or abs(n)!=1))+(x+sup(i,sups)*(i>1))*bool(i)+(d!=1)*('/'+str(d))))(*((c,1) if type(c)==polynomial else (int(de*c),1) if frac else (c.numerator,c.denominator) if type(c)==Fraction else (c,1))),enumerate(p))) if t else '0')+(')'*(t!=1)+'/'*(1+(0 and not gcd(p)%1))+str(de))*(1!=de))(denom(p) if frac else 1,smp(bool,p))
     __len__=lambda p: len(p.internal)
     deg=lambda p: len(p)-1
     __getitem__=lambda p,i: polynomial(p.internal[i]) if type(i)==slice else int(i<len(p)) and p.internal[i%len(p)]
@@ -69,12 +81,14 @@ class polynomial:
     pow=lambda a,n,m=None: a**n if m==None else squow(a,n,lambda a,b: a*b%m,polynomial(1))#funcxp(a.__mul__,n)(polynomial(1))
     __rtruediv__=lambda a,b: polynomial.__truediv__(b,a)
     __bool__=lambda p: p!=0
-    __mod__=lambda p,q: Y(lambda f: lambda p: polynomial(p) if len(p)<len(q) else f(p[:-len(q)]+tap(__sub__,p[-len(q):-1],tap(frac(p[-1],q[-1]).__mul__,q.internal[:-1]))))(p.internal) if len(q)>1 else p if q else ValueError('cannot modulo by zero polynomial')
+    __mod__=lambda p,q: polynomial(p)%polynomial(q) if int in {type(p),type(q)} else Y(lambda f: lambda p: polynomial(p) if len(p)<len(q) else f(p[:-len(q)]+tap(__sub__,p[-len(q):-1],tap(frac(p[-1],q[-1]).__mul__,q.internal[:-1]))))(p.internal) if len(q)>1 else p if q else ValueError('cannot modulo by zero polynomial')
+    __rmod__=lambda q,p: polynomial(p)%q
     moddiv=lambda p,q,little=False: Y(lambda f: lambda r,p: (polynomial(p),polynomial(r)) if len(p)<len(q) else f((pi:=frac(p[-1],q[-1]),)+r,p[:-len(q)]+tap(__sub__,p[-len(q):-1],map(pi.__mul__,q.internal[:-1]))))((),p.internal)
     __floordiv__=lambda p,q: p.moddiv(q)[1]
     gcd=lambda p,q: q.gcd(p) if len(p)<len(q) else polynomial.gcd(q,(lambda p: p and p/glccdm(*p))(p%q)) if deg(q) else x/x if q else p
     lcm=lambda p,q: p*q/p.gcd(q)
     __truediv__=lambda p,q,frac=True: p*Fraction(1,q) if isinstance(q,Number) else p and (lambda p,q: polynomial(shed(lambda r,i: (lambda d: (d,tarmap(lambda c,p: p-c*d,zip_longest(q[1:],r[1:]+(0,),fillvalue=0))))(nicediv(r[0],q[0],frac)),range(len(p)+1-len(q)),p)))(*trim(p,q))
+    __nicediv__=lambda p,q: p/q if type(q)!=polynomial else TypeError('do not nicediv polynomial by polynomial') #nicediv is meant to be guaranteed exact while truncating polynomial division is not that
     infdiv=lambda p,q,frac=True: polyfrac(p,q,frac=frac) #shed(lambda r,i: (lambda d: (d,tarmap(lambda c,p: p-c*d,zip_longest(q[1:],r[1:]+(0,),fillvalue=0))))(nicediv(r[0],q[0],frac)),count(),p)
     __eq__=lambda a,b: len(a)==1 and a[0]==b if type(b)==int else a.internal==(b.internal if type(b)==polynomial else b)
     __lshift__=lambda p,n: polynomial((0,)*n+p.internal)
@@ -95,6 +109,8 @@ numpoly=lambda num: sum(starmap(lambda k,c: chooseby(len(num)-1)(x+len(num)+~k)*
 add2=lambda a: lambda b: a+b
 hypergeometric=lambda p,q,egf=True: sum(redumulate(__mul__,map(lambda i: x/(i+1)**egf*prod(map(add2(i),p))/prod(map(add2(i),q)),range(-int(max(filter(lambda p: p==int(p)<=0,p))))),x/x)) #finite expansions only #egf is equivalent to appending a 1 to q
 nicergeometric=lambda p,q: sum(redumulate(lambda r,i: r*x*prod(map(add2(i),p))/prod(map(add2(i),q)),range(1,-int(max(filter(lambda p: p==int(p)<0,p)))),x/x)) #upperexclusivebrained
+
+en=lambda n: smp(lambda k: x**k/fact(k),range(n+1))*x/x #=exp(x)*Gamma(n+1,x)/n! #https://mathworld.wolfram.com/ExponentialSumFunction.html
 
 class polychoose:
     def __init__(p,*l):
@@ -155,14 +171,13 @@ from sympy import primerange,nextprime
 
 try:
     from sympy import divisors as symvisors,factorint,primefactors
-    factorise=lambda n,primes=True: polyprod(n) if type(n)==polynomial else tuple(factorint(n).items()) if primes else tuple(divisors(n)[1:]) #tuple(factorint(m).keys())+(m,)
     divisors=lambda n: tuple(symvisors(n)) if type(n)==int else tap(lambda d: frac(d,n.denominator),symvisors(n.numerator)) if type(n)==frac else ValueError(str(n)+' is not integer or fraction')
-    phi=totient=lambda n: prod(starmap(lambda p,e: (p-1)*p**(e-1),factorint(n).items()))
+    factorise=lambda n,primes=True,little=True: polyprod(n,little=little) if type(n)==polynomial else tuple(factorint(n).items()) if primes else tuple(divisors(int(n))) #tuple(factorint(m).keys())+(m,)
 except:
     #factorise=lambda n: tuple(filter(lambda k: not n%k,range(1,n//2+1)))+(n,)
-    factorise=lambda n: polyprod(n) if type(n)==polynomial else (lambda f: f+tap(lambda f: n//f,reversed(f[:-1] if isqrt(n)**2==n else f)))(tuple(filter(lambda a: not(n%a),range(1,isqrt(n)+1)))) #terrible but sufficient for time being (not reinventing the wheel of Atkin)
+    factorise=lambda n,little=True: polyprod(n,little=little) if type(n)==polynomial else (lambda f: f+tap(lambda f: n//f,reversed(f[:-1] if isqrt(n)**2==n else f)))(tuple(filter(lambda a: not(n%a),range(1,isqrt(n)+1)))) #terrible but sufficient for time being (not reinventing the wheel of Atkin)
 
-def kronecker(p,little=False,maxdeg=None): #highly inefficient but factorises rational-coefficiented polynomials
+def kronecker(p,little=True,maxdeg=None): #highly inefficient but factorises rational-coefficiented polynomials
     denom=lcm(*map(lambda c: c.denominator if type(c)==frac else 1,p.internal))
     p=denom*p
     l=[]
@@ -170,7 +185,7 @@ def kronecker(p,little=False,maxdeg=None): #highly inefficient but factorises ra
     i=0
     while i<=(deg(p)>>1 if maxdeg==None else maxdeg):
         if p(i):
-            r=tarmap(tuple.__add__,product(r,map(lambda n: (n,),(f:=divisors(p(i)))+tap(__neg__,f))))
+            r=tarmap(tuple.__add__,product(r,map(lambda n: (n,),(f:=factorise(p(i),False))+tap(__neg__,f))))
             if i:
                 for t in r:
                     d=fit(*enumerate(t[:i+1]))
@@ -184,13 +199,19 @@ def kronecker(p,little=False,maxdeg=None): #highly inefficient but factorises ra
         else: l.append(d:=(x-i)*(-1)**little if i else x);p/=d;r=((),);i=0
     return(l+[f:=p/denom]*(f!=1))
 
+multiplicitate=lambda p: (p//(g:=p.gcd(p.diff())),)+(() if deg(g)==0 else multiplicitate(g))
+multiplicityStratify=lambda p: tarmap(polynomial.__truediv__,pairwise(m:=multiplicitate(p)+(1,)))
+
+polyfactor=lambda p,little=False: (c:=tuple(charmap(lambda i,p: kronecker(p/glccdm(*p.internal),little)*(i+1),stilter(lambda i,p: deg(p)>0,enumerate(multiplicityStratify(p))))))+(reduce(lambda p,f: p//f,c,p),)
+
 class polyprod:
-    def __init__(p,*a):
-        a=tap(polynomial,chap(lambda p: kronecker(p,True),a))
-        p.d=prod(map(denom,a))
-        p.internal=lilter((1).__ne__,tap(lambda p: denom(p)*p,a))
+    def __init__(p,*a,little=True):
+        a=tuple(chap(lambda p: polyfactor(p,little),a))
+        g,r=transpose(map(lambda p: (g:=glccdm(*p.internal),p/g),a))
+        p.outerFactor=prod(g)/prod(map(denom,r))
+        p.internal=sorted(lilter((x/x).__ne__,tap(lambda p: denom(p)*p,r)),key=tuple)
         if not(len(p.internal)): p.internal=[polynomial(1),]
-    __repr__=lambda p: '*'.join(starmap(lambda f,m: f+(m!=1)*sup(m),rle(map(lambda n: (b:=len(tilter(id,n))!=1)*'('+str(n)+b*')',p))))+(p.d!=1)*('/'+str(p.d))
+    __repr__=lambda p: '*'.join(starmap(lambda f,m: f+(m!=1)*sup(m),rle(map(lambda n: (b:=len(tilter(id,n))!=1)*'('+str(n)+b*')',p))))+(((num:=p.outerFactor.numerator)!=1)*('*'+str(num))+((den:=p.outerFactor.denominator)!=1)*('/'+str(den)))
     __len__=lambda p: len(p.internal)
     __iter__=lambda p: iter(p.internal)
     index=lambda p,f: p.internal.index(f)
@@ -198,75 +219,37 @@ class polyprod:
     __call__=lambda p,x: prod(map(rcall(x),p))
     polynomial=lambda p: prod(p,polynomial(1))
 
-def linearFactors(p):
-    if any(p):
-        outer=gcd(*p)
-        p=tap(outer.__rfloordiv__,p)
-        linears=[]
-        while not p[0]: linears.append((0,1));p=p[1:]
-        happy=False
-        for f in range(len(p)-1): #degree n (length n+1) has n roots
-            g=gcd(*p)#(p[0],p[-1])
-            frac=tap(lambda n: factorise(abs(n//g),True),(p[0],p[-1]))
-            candidate=lap(lambda f: lap(lambda i: 0,range(len(f))),frac)
-            shareds=lap(lambda f: len(frac[1]) and next(map(lambda i: f[0] and not p[-1]%f[0] and frac[1][i][0]==f[0],range(len(frac[1])))),frac[0]) #why is next like this :-(
-            happy=sad=False #my feeling when
-            while True:
-                test=tap(lambda f,c: prod(map(lambda f,c: f[0]**c,f,c)),frac,candidate)
-                for sign in (1,-1): #this could be optimised slightly using Descartes's law of signs (but not verily)
-                    evaluation=sum(starmap(lambda i,c: c*(sign*test[0])**i*test[1]**(len(p)+~i),enumerate(p)))
-                    #print(test,evaluation)
-                    if not evaluation: happy=True;break #root found :-)
-                if happy:
-                    break
-                i=j=0
-                #print('c',i,j,candidate)
-                if any(frac):
-                    while True:
-                        if candidate[i]:
-                            candidate[i][j]+=1
-                            if candidate[i][j]<=frac[i][j][1] and not(not(i) and shareds[j] and candidate[0][j]): #do not have same factor in both
-                                break
-                            candidate[i][j]=0
-                        j+=1
-                        #print(i,j,j>=len(candidate[i]),sad)
-                        if j>=len(candidate[i]):
-                            if i: sad=True;break
-                            else: i+=1;j=0 #not i=1 because maybe one day we will have 3-sided fractions
-                    if sad: break
-                else: break
-            if happy:
-                frac=tap(lambda f,c: tap(lambda f,c: (f[0],f[1]-c),f,c),frac,candidate)
-                p=tuple(polynomial.__truediv__(p,(test[0],-sign*test[1])))
-                linears.append((test[0],-sign*test[1]))
-            else: break #raise(ValueError('not factorisable :-(',linears)) #however it will check roots of unity
-        r=((outer,),)*(outer!=1)+tuple(linears)+(p,)*(not happy)
-    else: r=((0,),)
-    r=tilter(lambda p: p!=polynomial(1),r)
-    return(r)#(polyprod(*r) if prod else r)
 
-
-roots=lambda *a,fracMode=True,complalways=False,quadsurd=True: (lambda a,b=0,c=0,d=0,e=0: #complalways will return complexes with +0j's for uniformity irrespective of input complexness
+rootFormulae=lambda *a,fracMode=True,complalways=False,quadsurd=True: (lambda a,b=0,c=0,d=0,e=0: #complalways will return complexes with +0j's for uniformity irrespective of input complexness
  (lambda wi,wo: (lambda di,do: tuple(chap(lambda i: (lambda ir: map(lambda j: (-1)**i*do/2+(-1)**j*ir/2-b/(4*a),range(2)))(sqrt((b/a)**2/2+(-1)**i*(4*b*c/a**2-8*d/a-(b/a)**3)/(4*do)-di-(wo*a*wi+4*c/a)/3)),range(2))))(wi/(3*cbrt(2)*a),sqrt((b/a)**2/4+di+wo/3*a*wi-2*c/(3*a))))(cbrt((lambda d: sqrt(d**2-4*(12*a*e-3*b*d+c**2)**3)+d)(-72*a*c*e+27*a*d**2+27*b**2*e-9*b*c*d+2*c**3)),cbrt(2)*(12*a*e-3*b*d+c**2))
 if e else
  (lambda cb: tap(lambda i: (lambda co: (co/2*cb+co.conjugate()*(3*a*c-b**2)/(2*cb)-b)/(3*a))(sqrt(3)*1j*(-1)**i-1 if i else 2),range(3)))(cbrt((sqrt((9*a*b*c-27*a**2*d-2*b**3)**2+4*(3*a*c-b**2)**3)-27*a**2*d+9*a*b*c-2*b**3)/2))
 if d else
  (quadroots(tap(int,(c,b,a))) if quadsurd else (lambda sq: (-(s:=b+sgn((sgn(b)/sgn(sq)).real)*sq)/(2*a),2*c/s) if True else tap(lambda e: ((-1)**e*sq-b)/(2*a),range(2)))((lambda d: sqrt(abs(d))*(1j**(d<0) if complalways else 1j if d<0 else 1))(b**2-4*a*c))) #numerical stability; https://codereview.stackexchange.com/a/294432
 if c else
- (-b/a,)
+ (-frac(b,a),)
 if b else
  ValueError('that is not how degree-0 polynomials work'))(*(funcxp(taph(frac),fracMode))((a[0] if len(a)==1 and type(a[0]) in {polynomial,tuple} else a)[::-1])) #I was going to include an f but this program is too small to contain it
 quadroots=lambda p: tap(lambda e: surd([[[-p[1],2*p[2]],1],[[(-1)**e*(p[1]**2-4*p[2]*p[0]),4*p[2]**2],2]]),range(2)) #surd class may only be used for quadroots, I don't think others can generally be unnested radicals
 newton=lambda p,x,n=1: funcxp(lambda x: x-p.diff()(x)/p(x),n)(x)
+roots=lambda p: tuple(chap(rootFormulae,factorise(p)))
 
-eigenvalues=lambda m: tuple(chap(roots,factorise(charpoly(m))))
-eigenvectors=lambda m,vals=None: tap(lambda v: (lambda t: (lambda x,y: (lambda q: q[:x]+((1,),)+q[x:])(matmul(inverse(tap(lambda t: t[:x]+t[x+1:],t[:y]+t[y+1:])),tap(lambda t: (-t[x],),t[:y]+t[y+1:]))))(*next(stilter(lambda x,y: any(map(lambda t: t[x] and any(t[:x]+t[x+1:]),t[:y]+t[y+1:])),product(range(len(t)),repeat=2)))))(tarmap(lambda i,r: r[:i]+(r[i]-v,)+r[i+1:],enumerate(m))),eigenvalues(m) if vals==None else vals)
-generaliseds=lambda m,val,mult,vec=None: expumulate(lambda v: tap(lambda r: (r[-1],),reduceRowEchelon(tap(tuple.__add__,tarmap(lambda i,r: r[:i]+(r[i]-val,)+r[i+1:],enumerate(m)),v))),mult-1)(eigenvectors(m,(val,))[0] if vec==None else vec) #all generalised eigenvectors corresponding with a given eigenvalue and multiplicity #do not put mat(inverse(tarmap(lambda i,r: r[:i]+(r[i]-eig,)+r[i+1:],enumerate(m)))).__mul__ into the expumulate()
+charpoly=characteristic=lambda m: polynomial(chartuple(m))
+eigenvals=eigenvalues=lambda m: roots(charpoly(m))
+#eigenvectors=lambda m,vals=None: tap(lambda v: (lambda t,tt: (lambda x,y: (lambda q: q[:x]+((1,),)+q[x:])(matmul(inverse(tap(lambda t: t[:x]+t[x+1:],t[:y]+t[y+1:])),tap(lambda t: (-t[x],),t[:y]+t[y+1:]))))(*next(stilter(lambda x,y: all(map(lambda t: t[x] and any(t[:x]+t[x+1:]),t[:y]+t[y+1:])) and all(map(lambda tt: tt[y] and any(tt[:y]+tt[y+1:]),tt[:x]+tt[x+1:])),product(range(len(t)),repeat=2)))))(t:=tarmap(lambda i,r: r[:i]+(r[i]-v,)+r[i+1:],enumerate(m)),tuple(transpose(t))),eigenvalues(m) if vals==None else vals) #this one is really bad and doesn't work on triangulars i think (do not use it)
+eigenbasis=lambda m,v: (lambda m: tap(lambda i: mat(tap(lambda r: (-r[i],),m[:i])+((1,),)+((0,),)*(len(m)+~i)),filter(lambda i: not m[i][i],range(len(m)))))(reduceRowEchelon(tarmap(lambda y,r: tarmap(lambda x,a: a-(x==y)*v,enumerate(r)),enumerate(m)),postPivot=True)) #returns the eigenbasis of inputted eigenvalue
+eigenvecs=eigenvectors=lambda m,vals=None: tap(lambda v: (v,)+eigenbasis(m,v),sorted(set(eigenvalues(m))) if vals==None else vals)
+#if an eigenvector is the start of a chain, use generaliseds to get the rest
+concat=lambda a,b: tuple(a)+tuple(b)
+generaliseds=lambda m,val,mult,vec=None: tap(expumulate(lambda v: mat(tap(lambda r: (r[-1],),reduceRowEchelon(tap(concat,tarmap(lambda i,r: r[:i]+(r[i]-val,)+r[i+1:],enumerate(m)),v),postPivot=True))),mult-1),tap(lambda v: v[1:],eigenvectors(m,(val,)))[0] if vec==None else vec) #all generalised eigenvectors corresponding with a given eigenvalue and multiplicity #do not put mat(inverse(tarmap(lambda i,r: r[:i]+(r[i]-eig,)+r[i+1:],enumerate(m)))).__mul__ into the expumulate()
 '''
->>> print(stratrix(tap(taph(rgetitem(0)),generaliseds(mat((1-x)**4),1,4))))
-(1,1,1,1,
- 3,2,1, ,
- 3,1, , ,
- 1, , , )
+>>> print(tap(tuple,generaliseds(mat((1-x)**4),1,4)))
+(((1,1,1,1)ᵀ, (3,2,1, )ᵀ, (3,1, , )ᵀ, (1, , , )ᵀ),)
+>>> n=3;m=mat(tap(lambda i: tap(lambda j: j==i if j in {0,n} else frac(abs(j-i)==1,2),range(n+1)),range(n+1)));print(stratrix(tap(taph(stratrix),eigenvecs(m))))
+(-1/2,(-1,3,-3,1)ᵀ,
+  1/2,(1,-1,-1,1)ᵀ,
+    1,  (1, , , )ᵀ,( , , ,1)ᵀ)
 '''
 #eigenvectors=lambda A,eigenvalues: tap(lambda k: tap(lambda i: prod(map(values[i].__sub__,eigenvalues(tap(lambda t: t[:k]+t[k+1:],A[:k]+A[k+1:]))))/prod(map(values[i].__sub__,values[:i]+values[i+1:])),range(len(A))),range(len(A))) #very elegant form from https://terrytao.wordpress.com/2019/08/13/eigenvectors-from-eigenvalues (however only supporting Hermitians)
+
+A076626=lambda n: (1,0,-1,0)[n-k&3]*(choose((n+k>>1)-1,k)+frac(choose((n+k>>1)-2,k-2),4) if 1 else frac(n*(n-2)+k,(n+k-2)*(n+k))*choose(n+k>>1,k))*2**k

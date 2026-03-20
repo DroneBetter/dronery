@@ -1,35 +1,44 @@
-from dronery.common import Y,frac,reduce,compose,revange,Iterable,starmap,larmap,product,transpose,maph,smp,tap,taph,lap,laph,chap,zip_longest,exchange,batched,dot,squow,prod
+from dronery.common import dbg,Y,frac,reduce,shortduce,rgetitem,compose,revange,Iterable,starmap,larmap,product,transpose,maph,smp,tap,taph,tarmap,lap,laph,chap,zip_longest,exchange,batched,dot,squow,prod,funcxp,stuncxp,randrange
 from dronery.surd import nicediv,rnicediv
 from operator import __sub__,__add__
 from copy import deepcopy
 
-stratrix=lambda m,dims=None,strict=True,keepzero=False: (lambda dims: (lambda m: '\n'.join((lambda s: (lambda c: starmap(lambda i,r: (' ' if i else '(')+(','+'\n'*(dims==3)).join(starmap(lambda i,s: ' '*(c[i]-len(s))+s,enumerate(r[:len(c)])))+(',' if len(m)+~i else ')'),enumerate(s)))(tap(lambda c: max(map(len,c)),zip_longest(*s,fillvalue=''))))(tap(taph(lambda f: stratrix(f,2,strict,keepzero) if dims==3 else str(f) if f or keepzero else ' '),m))))(tap(tuple,m) if dims==2 else Y(lambda f: lambda i: lambda m: tap(f(i-1),m) if i else m)(dims)((m,))))(Y(lambda f: lambda m,i: f(m[0],i+1) if isinstance(m,Iterable) else i)(m,0) if dims==None else dims)
-
+stratrix=lambda m,dims=None,strict=True,keepzero=False,_proc=False: (lambda dims: (lambda m: '\n'.join((lambda s: (lambda c: starmap(lambda i,r: (' ' if i else '(')+(','+'\n'*(dims==3)).join(starmap(lambda i,s: ' '*(c[i]-len(s))+s,enumerate(r[:len(c)])))+(',' if len(m)+~i else ')'),enumerate(s)))(tap(lambda c: max(map(len,c)),zip_longest(*s,fillvalue=''))))(tap(taph(lambda f: stratrix(f,2,strict,keepzero) if dims==3 else str(f) if f or keepzero else ' '),m))))(tap(tuple,m) if dims==2 else Y(lambda f: lambda i: lambda m: tap(f(i-1),m) if i else m)(dims)((m,))))(Y(lambda f: lambda m,i: f(m[0],i+1) if isinstance(m,Iterable) and type(m)!=str else i)(m,0) if dims==None else dims) if isinstance(m,Iterable) and type(m)!=str and (_proc or type(m)!=mat) else str(m)
+dbgatrix=lambda m: (m,print(stratrix(m)))[0]
 #matmul=lambda a,b: map(lambda a: map(lambda b: dot(a,b),transpose(b)),a)
 matmul=lambda a,b: tap(tuple,batched(starmap(dot,product(a,transpose(b))),len(b[0])))
 
-def reduceRowEchelon(m,fracMode=True):
+def reduceRowEchelon(m,fracMode=True,postPivot=False):
     #row-major order
     #number of nonzero rows in output corresponds with rank of space spanned by row vectors
     #to see the coefficients, augment the matrix by adjoining an identity matrix to the right
+    #postPivot moves each row afterwards such that its leftmost element is on the diagonal (necessary for poly.eigenbasis and poly.generaliseds)
     m=lap(laph(frac) if fracMode else list,m)
-    if not m: return m
     lead=0
-    for r in range(len(m)):
+    k=len(m[0])
+    breakulate=False
+    for r in range(n:=len(m)):
         i=r
         while not m[i][lead]:
             i+=1
-            if i==len(m):
+            if i==n:
                 i=r
                 lead+=1
-                if lead==len(m[0]): return m
+                if lead==k:
+                    breakulate=True
+                    break
+        if breakulate: break
         exchange(m,i,r)
         mr=lap(m[r][lead].__rtruediv__,m[r]) if fracMode else m[r]
         m=larmap(lambda i,mi: mr if i==r else lap(__sub__,mi,lap(mi[lead].__mul__,mr)),enumerate(m))
         lead+=1
-        if lead==len(m[0]): break
+        if lead==k: break
+    if postPivot: i=0;m=[m[(i:=i+1)-1] if m[i][j] else [0]*k for j in range(n)]
     return m
-dim=rank=lambda m: r.index(z) if (z:=[0]*len(m[0])) in (r:=reduceRowEchelon(m)) else len(m)
+dim=rank=lambda m: r.index(z) if (z:=[0]*k) in (r:=reduceRowEchelon(m)) else len(m)
+
+augment=lambda m: tarmap(lambda y,r: r+(0,)*y+(1,)+(0,)*(len(m)+~y),enumerate(m))
+deaugment=lambda a: (tap(lambda r: r[:len(r)>>1],a),tap(lambda r: r[len(r)>>1:],a))
 
 def pivot(m):
     m=lap(list,m)
@@ -75,26 +84,37 @@ def lu(m):
     return(lap(lambda i: [0]*i+[1]+[0]*(len(m)+~i),__import__('dronery.perms').permutation(p).inverse()),l,u)
 ludet=lambda m: prod(starmap(lambda i,r: r[i],enumerate(lu(m)[2])))
 
-det=lambda m: adjdet(m) if all(map(compose(maph(lambda n: type(n)==int),all),m)) else ludet(m)
+condense=lambda m: tap(lambda y: tap(lambda x: m[y][x]*m[y+1][x+1]-m[y][x+1]*m[y+1][x],range(len(m)-1)),range(len(m)-1))
+wondet=lambda m: stuncxp((lambda a,b: (b,tap(lambda br,ar: tap(int.__floordiv__,br,ar[1:-1]),condense(b),a[1:-1]))) if all(chap(maph(lambda a: type(a)==int),m)) else (lambda a,b: (b,tap(lambda br,ar: tap(frac,br,ar[1:-1]),condense(b),a[1:-1]))),len(m)-2)((m,condense(m)))[1][0][0] #Lewis Carroll's algorithm #you see like Alice in wondetland ahaha
+#warning do not use this on account of possibility of division by 0
+
+det=lambda m: adjdet(m) if all(map(compose(maph(lambda n: type(n)==int),all),m)) else ludet(m) #product of eigenvalues
+trace=lambda m: smp(lambda i: m[i][i],range(len(m))) #sum of eigenvalues
 #testing
 if __name__=='__main__':
     factdet=lambda m: smp(lambda p: (-1)**permutation(p).parity()*prod(map(lambda i: m[i][p[i]],range(len(m)))),permutations(range(len(m)))) #O(n!)
     from time import time
-    v=8;trit=[];adt=[];ldt=[]
+    v=8;trit=[];adt=[];ldt=[];wdt=[]
     for l in range(1<<6,1<<7):
         m=tap(lambda y: tap(lambda x: frac(randrange(-v,v+1),3),range(l)),range(l))
         """while l>5 or factdet(l)!=0:
             m=tap(lambda y: tap(lambda x: randrange(-v,v+1),range(l)),range(l))"""
         t=time()
         tri=tridet(m);trit.append(-t+(t:=time()))
-        ad=0;adt.append(0)#ad=adjdet(m);adt.append(-t+(t:=time()))
-        ld=ludet(m);ldt.append(time()-t)
-        print(l,trit[-1],adt[-1],ldt[-1],tri,ad,ld)
+        if (skipadj:=False): ad=0;adt.append(0)
+        else: ad=adjdet(m);adt.append(-t+(t:=time()))
+        ld=ludet(m);ldt.append(-t+(t:=time()))
+        try: wd=wondet(m)
+        except: wd=0
+        wdt.append(time()-t)
+        print(str(l)+'\n'+stratrix((('triang',trit[-1],tri),('adj',adt[-1],ad),('lu',ldt[-1],ld),('alice',wdt[-1],wd)),dims=2))
         print(m==reduce(matmul,lu(m))) #conclusions: adj is approximately 2* faster than lu for integer-valued matrices but 10* slower for fraction-valued ones
     #todo: determine why tridet seems slower
 
-charpoly=characteristic=lambda m: __import__('dronery.poly').polynomial(Y(lambda f: lambda t,a: t if len(t)>len(m) else f((n:=frac(-smp(lambda i: a[i][i],range(len(m))),len(t)),)+t,matmul(m,tap(taph(__add__),a,tap(lambda i: i*(0,)+(n,)+(len(m)+~i)*(0,),range(len(m)))))))((1,),deepcopy(m))) #Faddeev-LeVerrier algorithm (my beloved)
+chartuple=lambda m: Y(lambda f: lambda t,a: t if len(t)>len(m) else f((n:=frac(-smp(lambda i: a[i][i],range(len(m))),len(t)),)+t,matmul(m,tap(taph(__add__),a,tap(lambda i: i*(0,)+(n,)+(len(m)+~i)*(0,),range(len(m)))))))((1,),deepcopy(m)) #Faddeev-LeVerrier algorithm (my beloved)
+
 #do not worry; I am pretty sure __import__ gets cached
+#note that eigenvectors resides in .poly
 
 matpow=lambda m,n: squow(inverse(m) if n<0 else m,abs(n),matmul,tap(lambda i: (0,)*i+(1,)+(0,)*(len(m)+~i),range(len(m))))
 
@@ -108,7 +128,10 @@ class mat: #the entire motivation is to clean things up by making polynomials in
     __add__=lambda m,l: mat(tap(taph(__add__),m,l))
     __sub__=lambda m,l: mat(tap(taph(__sub__),m,l))
     __neg__=lambda m,l: mat(tap(taph(__sub__),m))
-    __mul__=lambda m,l: mat(matmul(m,l))
+    __mul__=lambda m,l: mat(tap(taph(frac(l).__mul__),m)) if type(l) in {int,frac} else mat(matmul(m,l))
+    __rmul__=lambda m,l: m*l if type(l) in {int,frac} else mat(l)*m
     __pow__=lambda m,i: mat(matpow(m,i))
-    __repr__=stratrix
+    __repr__=lambda m: stratrix(tap(rgetitem(0),m),_proc=True)+'ᵀ' if all(map(lambda r: len(r)==1,m)) else stratrix(m,_proc=True)
 idmat=lambda n: mat(tap(lambda i: (0,)*i+(1,)+(0,)*(n+~i),range(n)))
+compmat=lambda p: mat(((-p/p[-1])[-2::-1],)+tap(lambda n: (0,)*n+(1,)+(0,)*(p.deg()+~n),range(p.deg()-1))) #
+kroneckerProd=lambda a,b: mat(tap(lambda i: tap(lambda j: a[i//len(b)][j//len(b[0])]*b[i%len(b)][j%len(b[0])],range(len(a[0])*len(b[0]))),range(len(a)*len(b))))

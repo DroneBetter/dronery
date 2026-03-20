@@ -72,8 +72,12 @@ def bitverse(n,d=None):
     return(n>>1+(~d^~0<<d.bit_length()) if d&d-1 else n)
 niceA030101=bitverse
 
-
 from sympy import LambertW as W
+T=lambda x: -W(-x) #Euler's tree function
+Q=lambda n: smp(lambda k: frac(falling(n,k),n**k),range(1,n+1)) #Ramanujan's Q function
+#note that Q(n) = en(n-1)(n)*frac(fact(n),n**n), with en from poly.py
+A063170=lambda n: n**n*(Q(n)+1)
+A231536=lambda n,k: fact(n)//fact(k)*smp(lambda j: fact(n-1)//fact(j)*(n-j)*subset(j,n-k),range(n-k,n+1))
 
 def accel_asc(n): #(thank you https://jeromekelleher.net/generating-integer-partitions.html ;-)
     if n:
@@ -95,7 +99,11 @@ def accel_asc(n): #(thank you https://jeromekelleher.net/generating-integer-part
             a[k]=y+1
             yield a[:k+1]
     else: yield [] #returning ([],) rather than ([0],) makes many identities nicer; with it, choose(n-1,k-1)=smp(lambda p: len(p)==k and choose(len(p),*map(rgetitem(1),rle(p))),accel_asc(n)) works for choose(-1,-1)=1
-integerPartitions=accel_asc
+intPart=integerPartitions=accel_asc #for ordered, see diffcomb
+
+ncontains=lambda l: lambda i: i not in l
+reciPart=setPartitionsIntoSizes=lambda *a: Y(lambda f: lambda s,*a: [[c]+r for c in combinations(s,a[0]) for r in f(lilter(ncontains(c),s),*a[1:])] if a else [[]])(range(sum(a)),*a) #thank you https://stackoverflow.com/a/4578820
+#recipe-part portparteau #partitions into list of subsets #len = choose(sum(args),*args)
 
 diffs=lambda t: larmap(int.__rsub__,pairwise(t))
 compositions=lambda n,k: ([n],) if k==1 else ([c[0]]+diffs(c)+[n-c[-1]] for c in combinations(range(1,n),k-1))
@@ -118,11 +126,11 @@ stilter=starlter=lambda f,i: filter(lambda i: f(*i),i)
 tilter=lambda f,i: tuple(filter(f,i))
 lilter=lambda f,i: list(filter(f,i))
 stax=lambda i,key=None: max(i,key=None if key==None else lambda i: key(*i))
-chap=(lambda f,*i: chain.from_iterable(map(f,*i)));charmap=(lambda f,*i: chain.from_iterable(starmap(f,*i)))
+chap=lambda f,*i: chain.from_iterable(map(f,*i));chaph=lambda f: lambda *i: chain.from_iterable(map(f,*i));charmap=lambda f,*i: chain.from_iterable(starmap(f,*i))
 compose=lambda *f: lambda *a: reduce(lambda a,f: (lambda i,f: f(a) if i else f(*a))(*f),enumerate(f),a)
 #(funcxp,expumulate)=map(lambda f: eval("lambda f,l: lambda i: "+f+"(lambda x,i: f(x),range(l),i)"),("reduce","redumulate")) #unfortunately has overhead
 funcxp=(lambda f,l: lambda i: reduce(lambda x,i: f(x),range(l),i)) #short for funcxponentiate
-consxp=(lambda f,l: lambda i: reduce(lambda x,i: f(*x),range(l),i)) #short for consxponentiate
+stuncxp=consxp=(lambda f,l: lambda i: reduce(lambda x,i: f(*x),range(l),i)) #short for starfuncxp or consxponentiate
 expumulate=lambda f,l: lambda i: accumulate(range(l),lambda x,i: f(x),initial=i) #inlined, expumulate(f,l)(i) is equivalent to map(lambda n: funcxp(f,n)(i),range(l))
 ORsum =lambda l: reduce(int.__or__,l, 0)
 cup   =lambda l: reduce(set.__or__,l,set())
@@ -183,8 +191,8 @@ choose=lambda n,*k: (lambda n,*k: (-1)**abs(sum(k:=k[:(i:=k.index(min(k)))]+k[i+
 #choose=lambda n,k: comb(n,k) if n>=0 else (-1)**(k+n)*comb(~k,~n) if k<0 else (-1)**k*comb(k+~n,k)
 multichoose=lambda n,*k: choose(n+sum(k)-1,*k)
 
-falling=lambda n,k: ((frac((-1)**-k*fact(k+~n),fact(~n)) if k<0 else n<0 and (-1)**k*fact(k+~n)//fact(~n)) if n<k else (n>=0 and frac(fact(n),fact(n-k)) if k<0 else fact(n)//fact(n-k))) if all(map(lambda x: type(x) not in {float,complex},(n,k))) else (-1)**n*gamma(-n+k)/gamma(-n) if type(n)==int and n<0 else gamma(n+1)/gamma(n+1-k)
-rising=lambda n,k: (-1)**abs(k)*falling(-n,k) if all(map(lambda x: type(x) not in {float,complex},(n,k))) else (-1)**n*gamma(1-n)/gamma(1-n-k) if type(n)==int and n<0 else gamma(n+k)/gamma(n)
+falling=lambda n,k: prod(map(lambda i: n-i,range(k))) if type(n)==frac and type(k)==int else ((frac((-1)**-k*fact(k+~n),fact(~n)) if k<0 else n<0 and (-1)**k*fact(k+~n)//fact(~n)) if n<k else (n>=0 and frac(fact(n),fact(n-k)) if k<0 else fact(n)//fact(n-k))) if all(map(lambda x: type(x) not in {float,complex},(n,k))) else (-1)**n*gamma(-n+k)/gamma(-n) if type(n)==int and n<0 else gamma(n+1)/gamma(n+1-k)
+rising=lambda n,k: prod(map(lambda i: n+i,range(k))) if type(n)==frac and type(k)==int else (-1)**abs(k)*falling(-n,k) if all(map(lambda x: type(x) not in {float,complex},(n,k))) else (-1)**n*gamma(1-n)/gamma(1-n-k) if type(n)==int and n<0 else gamma(n+k)/gamma(n)
 lah=lambda n,k: not n==0<k and choose(n-1,k-1)*falling(n,n-k)
 A001263=narayana=lambda n,k: k and choose(n-1,k-1)*choose(n,k-1)//k
 A132812=lambda n,k: choose(n,k)*choose(n,k-1)
@@ -200,13 +208,15 @@ superchoose=lambda n,k: superfact(n)//(superfact(k)*superfact(n-k))
 Delta=forwardDifferences=lambda f,n=1: lambda k: smp(lambda i: choose(~i,~n)*f(k+i),range(n+1)) #nth iterate
 
 #Stirling numbers of the second kind
-subset_int=lambda n,k: forwardDifferences(lambda i: i**n,k)(0)//fact(k)
+subset_int=lambda n,k: (__floordiv__ if type(n)==int else __truediv__)(forwardDifferences(lambda i: i**n,k)(0),fact(k))
 #subset_int=lambda n,k: smp(lambda i: choose(~i,~k)*i**n,range(k+1))//fact(k)
 #subset_int=lambda n,k: smp(lambda i: choose(-i,-k)*i**(n-1),range(1,k+1))//fact(k-1) #decrement choose by removing mutual factors for extremely marginal speedup
 #subset_int=lambda n,k: sum(starmap(lambda i,c: c*i**n,enumerate(redumulate(lambda r,i: r*(i+~k)//i,range(1,k+1),(-1)**k))))//fact(k) #better way (using (-1)**(k-i)*choose(k,i)=choose(k,i-1)*(i+~k)//i (exceedingly fast))
 subset_int=lambda n,k: sum(starmap(lambda i,c: c*(i+1)**(n-1),enumerate(redumulate(lambda r,i: r*(i-k)//i,range(1,k),(-1)**(k-1)))))//fact(k-1) #combining both optimisations
-rsubset_int=lambda r,n,k: smp(lambda i: choose(~i,~k)*frac(i)**(n-r)*falling(i,r),range(r,k+1))/fact(k) if 0<=k and (0<=r or k<0 or n-r>=0) else sum(map(lambda i: choose(n-r,i)*subset(i,k-r)*r**(n-r-i),range(k-r,n-r+1))) #supporting extension to negative n by default
-rcycle_int=lambda r,n,k: smp(lambda j: choose(n-r,j)*cycle(j,k-r)*rising(r,n-r-j),range(n-r+1))
+#r-Stirling numbers (see https://doi.org/10.1016/0012-365X(84)90161-4)
+rsubset_int=lambda r,n,k: (k>=r and smp(lambda i: choose(~i,r+~k)*frac(i+r)**(n-r),range(k-r+1))//fact(k-r)) if type(r)==int and 0<=k and (0<=r or k<0 or n-r>=0) else sum(map(lambda i: choose(int(n-r),int(k+i-r))*subset(int(k+i-r),int(k-r))*r**(n-k-i),range(int(n-k)+1))) #supporting extension to negative n and positive k by default! #warning! if r is fractional, n and k must have the same fractional part
+#alternatively, smp(lambda i: choose(~i,~k)*frac(i)**(n-r)*falling(i,r),range(r,k+1))/fact(k) (equation 32)
+rcycle_int=lambda r,n,k: smp(lambda i: choose(int(n-r),int(k-r)+i)*cycle(int(k-r)+i,int(k-r))*rising(r,int(n-k)-i),range(int(n-k)+1)) #(eq. 27 and thus 56)
 '''see also subset_recolumnce in __init__ (which transpires to be much slower actually)'''
 #Stirling numbers of the first kind
 #cycle_int=lambda n,k: smp(lambda i: choose(-k,-i)*choose(2*n-k,i)*subset(i-k,i-n),range(n,2*n+1-k))
@@ -257,15 +267,6 @@ egfexp=lambda f: lambda n: fact(n)*smp(lambda p: frac(choose(len(p),*map(rgetite
 faa=lambda f,g,egf=False: lambda n: smp(lambda p: frac(f(len(p)),fact(len(p)) if egf else 1)*prod(map(g,p))*(choose(n,*p) if egf else 1)*choose(len(p),*map(rgetitem(1),rle(p))),accel_asc(n)) #Faà di Bruno is so cool
 #A048172=lambda n: egfexp(A058349)(n)-(n==0)-A058349(n)
 A000262=egfexp(lambda n: n and fact(n))
-bell=lambda n: smp(lambda k: subset(n,k),range(n+1))
-touchard=lambda n: polynomial(tap(lambda k: subset(n,k),range(n+1)))
-#touchard=lambda n: polynomial(Y(lambda f: lambda k,p,o: o if k>n else f(k+1,(md:=moddiv(p,x-k))[1],o+(md[0][0],)))(2,polynomial((1,)*(n-1)),(0,1))) #very slow and bad
-touchard=lambda n: polynomial(Y(lambda f: lambda k,p,o: o if k>n else f(k+1,(md:=Y(lambda f: lambda p,d: (p[0],d) if len(p)==1 else f((p[1]+k*p[0],)+p[2:],d+(p[0],)))(p,()))[1],o+(md[0],)))(1,(1,)+(0,)*(n-1),(0,))) #beats out other one for n>(about 512); from https://scholars.iwu.edu/ws/portalfiles/portal/39727279/fulltext.pdf
-subbell=lambda n: smp(lambda k: choose(~k,~n)*bell(k),range(n+1))
-#Bell polynomials; copying SymPy for now
-bellY=lambda n,k,x: sum(starmap(lambda m,c: x[m]*c*bellY(n+~m,k-1,x[:n-k-m+1]),enumerate(redumulate(lambda c,m: c*(n+~m)/(m+1),range(n-k),frac(1))))) if n and k else not (n or k) #mth value of c is choose(n-1,m) #à la Mathematica's name; conventionally the 'partial/incomplete Bell polynomials'
-bellM=lambda n,x: smp(lambda k: bellY(n,k,x[:n-k+1]),range(n+1)) #M for multivariate
-#note that the Y polynomials of Riordan are actually the M polynomials here
 
 from sympy.utilities.iterables import multiset_permutations,multiset_partitions #note latter is equivalent to accel_asc
 #ordertitions=lambda C,K,P: lambda n,k: smp(lambda p: len(p)==k and (((choose(len(p),*map(rgetitem(1),rle(p))) if K==2 else len(sap(lambda p: tuple(min(map(lambda i: p[i:]+p[:i],range(k)))),multiset_permutations(p)))) if C else fact(len(p) if K==2 else len(p)-1)) if K else 1)*(prod(map(fact,p)) if P==2 else prod(map(lambda i: fact(i-1),p)) if P else 1),accel_asc(n)) if k else int(not n)
@@ -310,11 +311,12 @@ chinese=lambda m,c: int.__rmod__(pr:=prod(m:=tuple(m)),smp(lambda m,c: c*pow(p:=
 from sympy import factorint
 choosemod=lambda n,k,m: chinese(tarmap(int.__pow__,f:=tuple(factorint(m).items())),tarmap(lambda p,q: p**chooseval(n,k,p)*chooseLastqOnDigs(n,k,p,max(0,q-chooseval(n,k,p))),f)) #choosemodp for not-necessarily-prime bases
 
-def firstchoose(k,i): #first n such that choose(n,k)>=i
+def firstchoose(k,i,lower=False): #first n such that choose(n,k)>=i
     n=k;c=1
     while c<=i:
         n+=1;c=c*n//(n-k)
-    return(n)
+    return n-(lower and c>i)
+invchoose=lambda k,i: firstchoose(k,i,True)
 
 from re import finditer,Match
 occurrences=lambda s,st: map(Match.start,finditer(s,st)) #occurrences=compose(finditer,maph(Match.start)) #seems not to work for whatever reason
@@ -376,6 +378,37 @@ class fenwick:
         i|=j
       j>>=1
     return i
+
+class combsys: #combinatorial number systems (and adjacent conventions)
+    #biject between range(multichoose(n,k)) and the set of sorted k-tuples of numbers <n
+    #however, n is left unspecified; use islice
+    #see the start of https://oeis.org/wiki/User:Natalia_L._Skirrow/Stirlingtopes
+    def __init__(s,k,curr=None):
+        s.k=k
+        s.current=(0,)*k if curr==None else curr
+    __getitem__=lambda s,i: Y(lambda f: lambda r,d,i: f((n:=invchoose(d+1,i)-d,)+r,d-1,i-choose(n+d,d+1)) if d else (i,)+r)((),s.k-1,i)
+    index=lambda s,n: sum(starmap(lambda d,i: choose(i+d,d+1),enumerate(n)))
+    succ=lambda s,n: Y(lambda f: lambda d: f(d+1) if d<len(n)-1 and n[d]>=n[d+1] else (0,)*d+(n[d]+1,)+n[d+1:])(0)
+    def __next__(s):
+        old=s.current
+        s.current=s.succ(s.current)
+        return old
+    __iter__=lambda s: s
+
+class diffcomb: #forward differences of combsys
+    #there is another convention; see https://math.stackexchange.com/a/5106951 for details
+    def __init__(d,n,k,curr=None):
+        d.n=n
+        d.k=k
+        d.sys=combsys(k,(0,)*(k-1)+(n,))
+        d.i=0
+    def __next__(d):
+        if d.i>=multichoose(d.n+1,d.k-1): raise StopIteration
+        else:
+            d.i+=1
+            return tarmap(int.__rsub__,pairwise((0,)+d.sys.__next__()))
+    __iter__=lambda d: d
+orderedIntPart=diffcomb #for unordered, see normal intPart
 
 from numbers import Number
 sgn=(lambda n,zerositive=False: n and (-1)**(n<0) or zerositive if isinstance(n,Number) else (lambda m: type(n)(tap(m.__rtruediv__,n)) if 0!=m!=1 else n)(hypot(*n)))
