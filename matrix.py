@@ -2,7 +2,6 @@ from dronery.common import dbg,Y,frac,reduce,shortduce,rgetitem,compose,revange,
 from dronery.surd import nicediv,rnicediv
 from operator import __sub__,__add__
 from copy import deepcopy
-
 stratrix=lambda m,dims=None,strict=True,keepzero=False,_proc=False: (lambda dims: (lambda m: '\n'.join((lambda s: (lambda c: starmap(lambda i,r: (' ' if i else '(')+(','+'\n'*(dims==3)).join(starmap(lambda i,s: ' '*(c[i]-len(s))+s,enumerate(r[:len(c)])))+(',' if len(m)+~i else ')'),enumerate(s)))(tap(lambda c: max(map(len,c)),zip_longest(*s,fillvalue=''))))(tap(taph(lambda f: stratrix(f,2,strict,keepzero) if dims==3 else str(f) if f or keepzero else ' '),m))))(tap(tuple,m) if dims==2 else Y(lambda f: lambda i: lambda m: tap(f(i-1),m) if i else m)(dims)((m,))))(Y(lambda f: lambda m,i: f(m[0],i+1) if isinstance(m,Iterable) and type(m)!=str else i)(m,0) if dims==None else dims) if isinstance(m,Iterable) and type(m)!=str and (_proc or type(m)!=mat) else str(m)
 dbgatrix=lambda m: (m,print(stratrix(m)))[0]
 #matmul=lambda a,b: map(lambda a: map(lambda b: dot(a,b),transpose(b)),a)

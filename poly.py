@@ -3,6 +3,7 @@ from dronery.surd import nicediv,surd
 from dronery.ntt import fixlen
 from dronery.matrix import mat,matmul,inverse,chartuple,reduceRowEchelon,augment,deaugment,idmat,dbgatrix
 from operator import __add__,__neg__,__sub__,__mul__,__floordiv__,__truediv__,__eq__,__or__,__gt__
+from collections.abc import Callable
 
 def shed(f,l,i): #like a snake, not a garden building
     if type(l)==list:
@@ -39,6 +40,8 @@ bellM=lambda n,x: smp(lambda k: bellY(n,k,x[:n-k+1]),range(n+1)) #M for multivar
 bernoulli=lru_cache(lambda n,x=0: (1,x-frac(1,2))[n] if n<2 else (x or ~n&1) and smp(lambda k: choose(n,k)*bernoulli(n-k)*x**k,range(n+1)) if x else smp(lambda k: frac(choose(n,k),k+~n)*bernoulli(k),range(n))) #x determines whether upper-inclusive (may make bernoulli polynomial function next) #non-recursive form: lambda n: smp(lambda k: frac(smp(lambda r: (-1)**r*choose(k,r)*r**n,range(k+1)),k+1),range(n+1))
 ordinoulli=lambda n,x=1: bernoulli(n,x)*fact(n)
 gregory=lru_cache(lambda n: smp(lambda k: frac((-1)**k,k)*gregory(n+1-k),range(2,n+2)) if n else 1)
+A002206=lambda n: gregory(n+1).numerator
+A002207=lambda n: gregory(n+1).denominator
 subsetWard=lambda n,k: subset2(n+k,k)
 '''
 Nørlund ("generalised Bernoulli") numbers
@@ -70,7 +73,7 @@ class polynomial:
     deg=lambda p: len(p)-1
     __getitem__=lambda p,i: polynomial(p.internal[i]) if type(i)==slice else int(i<len(p)) and p.internal[i%len(p)]
     pop=lambda p,i=-1: p.internal.pop(i)
-    __add__=lambda a,b: a+polynomial(b) if isinstance(b,Number) else polynomial(starmap(__add__,zip_longest(a,polynomial(b),fillvalue=0)))
+    __add__=lambda a,b: a+polynomial(b) if isinstance(b,Number) else polynomial(chain(starmap(__add__,zip(a,polynomial(b))),a[len(b):])) if len(a)>=len(b) else polynomial.__add__(b,a)
     __neg__=lambda p: polynomial(-p if isinstance(p,Number) else map(__neg__,p))
     __sub__=lambda a,b: a+polynomial.__neg__(b)
     __rsub__=lambda a,b: -a+b
@@ -100,11 +103,23 @@ class polynomial:
     differences=lambda p: polynomial(matmul((p,),tap(lambda n: tap(lambda k: k<n and choose(n,k),range(len(p))),range(len(p))))[0]) #polynomial(polychoose(p)[1:]) #outputs b(n) = a(n+1)-a(n), gf multiplication by (1-x)/x
     partialSums=lambda p: polynomial(matmul((p,),tuple(redumulate(lambda r,n: (0,bernoulli(n))+tarmap(lambda i,c: c*frac(n,i+2),enumerate(r[1:n+1]))+(0,)*(deg(p)-n),range(1,len(p)),(0,1)+(0,)*deg(p))))[0]) #polynomial((0,)+polychoose(p)) #upper-exclusive, multiplication by x/(1-x)
 
-    gf=lambda p: sum(starmap(lambda k,c: (1-x)**(deg(p)-k)*tap(lambda i: eulerian(k,i),range(k+1))*c,enumerate(p)))#fixlen(tuple(),len(p)) #returns only numerator (where denominator is (1-x)**(deg(p)+1))
+    gf=lambda p: sum(starmap(lambda k,c: (1-x)**(deg(p)-k)*tap(lambda i: eulerian(k,i),range(k+1))*c,enumerate(p)))#remember to fixlen(tuple(),len(p)) if converting it from poly #returns only numerator (where denominator is (1-x)**(deg(p)+1))
     #gf(p)[j] = smp(lambda k: smp(lambda i: (-1)**(j-i)*choose(deg(p)-k,j-i)*eulerian(k,i),range(k+1))*p[k],range(len(p)))
-pol=polynomial
+poly=polynomial
 valx=lambda p: next(filter(lambda i: p[i],range(len(p))),-1)
 numpoly=lambda num: sum(starmap(lambda k,c: chooseby(len(num)-1)(x+len(num)+~k)*c,enumerate(num))) #given a numerator of a generating function, returns the polynomial expanson of the sequence with which it corresponds
+def lagrange(p,N=None,egf=False,unrev=False): #requires p[0]=0,p[1]=1
+    #adapted from Peter Luschny's prog from https://oeis.org/A394560
+    if isinstance(p,Iterable):
+        N=len(p)-1
+        pp=p
+        p=pp.__getitem__
+    yield 0
+    c=[1];h=[1]
+    for k in (count(1) if N==None else range(1,N+1)):
+        for n in (range if unrev else revange)(k): c[n]=dot((1+x)**(n+1),h,c[n::-1]) if egf else dot(h,c[n::-1]) #equivalently, c=fixlen(list(polynomial.__mul__(h,c)),k) #replacing revange with range might be interesting
+        yield c[k-1]
+        if N==None or k<N: c.append(0);h.append(-smp(lambda j: choose(k,j)*frac(p(j+1),j+1)*h[k-j] if egf else p(j+1)*h[k-j],range(1,k+1)))
 
 add2=lambda a: lambda b: a+b
 hypergeometric=lambda p,q,egf=True: sum(redumulate(__mul__,map(lambda i: x/(i+1)**egf*prod(map(add2(i),p))/prod(map(add2(i),q)),range(-int(max(filter(lambda p: p==int(p)<=0,p))))),x/x)) #finite expansions only #egf is equivalent to appending a 1 to q
@@ -208,6 +223,7 @@ class polyprod:
     def __init__(p,*a,little=True):
         a=tuple(chap(lambda p: polyfactor(p,little),a))
         g,r=transpose(map(lambda p: (g:=glccdm(*p.internal),p/g),a))
+        r=tuple(r)
         p.outerFactor=prod(g)/prod(map(denom,r))
         p.internal=sorted(lilter((x/x).__ne__,tap(lambda p: denom(p)*p,r)),key=tuple)
         if not(len(p.internal)): p.internal=[polynomial(1),]

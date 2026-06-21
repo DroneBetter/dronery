@@ -4,6 +4,7 @@ setrecursionlimit(1<<16)
 
 from matrix_unraveller import strucget,strucset,structrans,enmax,localised
 from dronery.common import*
+from dronery.comb import*
 from operator import __add__,__neg__,__sub__,__mul__,__floordiv__,__truediv__,__eq__,__or__,__gt__
 from dronery.ntt import fixlen
 import dronery.ntt
@@ -12,7 +13,7 @@ from dronery.matrix import*
 from dronery.poly import*
 from dronery.linRecur import*
 from dronery.numthy import*
-from dronery.perms import permutation
+from dronery.perms import*
 
 
 
@@ -95,16 +96,6 @@ bindex=lambda n: Y(lambda f: lambda s,m,c,i,n: f(*(((s+c,m,c*i//(i+1-m)) if n&1 
 bindex=lambda n: Y(lambda f: lambda s,m,c,i,n: f(*((s+c,m,c*i//(i+1-m)) if n&1 else (s,m+1,c*i//m)),i+1,n>>1) if n else s)(0,1,1,(v:=val2(n+1))+1,n>>v)
 
 binget=lambda w,i: construce(lambda o,m,i,n: (o<<1,m,i) if i<choose(n,m) else (o<<1|1,m-1,i-choose(n,m)),revange(firstchoose(w,i)),(0,w,i))[0]
-
-class lexbin:
-    def __init__(l,m,n=0): #m=bit_count, n=bit_length of register
-        l.m=m;l.n=l.m
-        l.length=choose(n,m)
-    __len__=(lambda l: l.length)
-    index=lambda l,i: bindex(i)
-    getter=lambda l,i: construce(lambda o,m,i,n: (o<<1,m,i) if i<choose(n,m) else (o<<1|1,m-1,i-choose(n,m)),revange(firstchoose(l.m,i)),(0,l.m,i))[0]
-    __getitem__=lambda l,i: expumulate(lexinc,i.stop+~(i.start or 0))(l.getter(i.start or 0)) if type(i)==slice else l.getter(i)
-    __iter__=lambda l: expumulate(lexinc,choose(l.n,l.m)-1)(~(~0<<l.m))
 
 
 ceil=lambda x: int(x)+(x>int(x))

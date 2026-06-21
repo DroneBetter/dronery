@@ -66,7 +66,8 @@ def fibonacci(k): #not faster (in terms of arithmetic) than using nacci(2,k) lis
         c=2*a*b-d
         d+=b**2
         (a,b)=(d,c+d) if k>>i&1 else (c,d)
-    return(a)
+    return a
+#fibonacci=lambda n: pow(2,(m:=n+1)*m,~(~0<<2*m|1<<m))&~(~0<<m) #yesss yes my pretty,,, i love you so much do not listen to what the OEIS editors say
 fib=fibonacci
 #nacci=lambda n,k: smp(lambda s: '1'*n not in str(bin(s)),range(1<<k-n)) if k>=n else k==n-1 #Θ(2**k) but nice interpretation to bear in mind
 #nacci=lambda n,k: smp(lambda i: nacci(n,k-i),range(1,n+1)) if k>=n else k==n-1 #trivial and also no caching, Θ(output) = Θ(φₙ**k)
@@ -88,7 +89,7 @@ class polyfrac: #for representing rational functions as ordinary generating func
     bracketate=lambda f,p: '('*bool(deg(p))+str(p)+')'*bool(deg(p))
     __repr__=lambda f: f.bracketate(f.a)+'/'+f.bracketate(f.b)
     __bool__=lambda f: bool(f.num)
-    def __init__(f,a,b=None,frac=True,cache=True,de_gcd=True):
+    def __init__(f,a,b=None,frac=True,cache=False,de_gcd=True):
         f.cache=cache
         if type(a)==polyfrac:
             f.a,f.b=a.a,a.b
@@ -116,7 +117,7 @@ class polyfrac: #for representing rational functions as ordinary generating func
         f.a,f.b=tap(lambda t: reduce(polynomial.__mul__,t,polynomial(1)),(fa,fb))'''
         f.ma=f.a
         f.expanded=[]
-        f.num=polynomial(a);f.den=polynomial(b)
+        f.num=polynomial(f.a);f.den=polynomial(f.b)
     def __next__(f):
         d=nicediv(f.ma[0],f.b[0],True)
         f.ma=tarmap(lambda c,a: a-c*d,zip_longest(f.b[1:],f.ma[1:]+(0,),fillvalue=0))
@@ -139,7 +140,7 @@ gfslice=lambda a,b,l=None: tuple(islice(polynomial.infdiv(a,b),0,len(a) if l==No
 
 if __name__ == '__main__':
     print('Fibonacci numbers')
-    x1 = [0,0,1,2,3,5,8]
+    x1=[0,0,1,2,3,5,8]
     print(nthTermGuess(x1, 16))
     print(nthTermGuess(x1, 4))
     

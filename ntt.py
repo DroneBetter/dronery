@@ -22,7 +22,7 @@ def transpow2(v,r,m):
                 v[o],v[j]=(v[j]-vo)%m,(v[j]+vo)%m
     return v
 
-fixlen=lambda v,l,fillvalue=0: v[:l] if l<len(v) else v+([fillvalue] if type(v)==list else (fillvalue,))*(l-len(v))
+fixlen=lambda v,l,fillvalue=0: v[:l] if l<len(v) else (v if type(v)==tuple else (v:=list(v)))+([fillvalue] if type(v)==list else (fillvalue,))*(l-len(v))
 
 def convolve(v0,v1,l=None,pad=False,m=None):
     v0,v1=map(list,(v0,v1))

@@ -1,5 +1,5 @@
 #this section mostly explained in https://oeis.org/wiki/User:Natalia_L._Skirrow/Stirling_factoradics
-#note that the default convention is colexicographic; 
+#note that the default convention is colexicographic; the 'nice' versions violate this to be linear-time instead of linearithmic
 
 from dronery.common import*
 from dronery.poly import x
@@ -27,7 +27,7 @@ def factoradic(n,l=None):
     n//=d
     d+=1
   return f+[0]*(l!=None and l-len(f))
-unfactoradic=lambda f: sum(starmap(lambda i,d: fact(i)*d,enumerate(f)))
+unfactoradic=lambda f: dot(f,redumulate(int.__mul__,range(1,len(f)),1)) #do not use sum(starmap(lambda i,d: fact(i)*d,enumerate(f)))
 '''def perm(f,n=None): #O(n**2) due to list.pop being O(n)
   if n==None: n=len(f)
   l=list(range(n))
@@ -212,7 +212,7 @@ class permutation:
   __mul__=(lambda a,b: permutation(permute(a,b)))
   __rmul__=__mul__
   index=(lambda p,i: p.internal.index(i))
-  def __init__(p,t,nice=0): #my feeling when it cannot be a lambda :-(
+  def __init__(p,t,n=None,nice=0): #my feeling when it cannot be a lambda :-(
     if isinstance(t,(map,filter)): t=tuple(t)
     '''if type(t)==factoradic:
       l=list(range(len(f)))
@@ -221,6 +221,7 @@ class permutation:
       return p.internal'''
     #p.internal=reduce(lambda t,i: ((len(s)+~t[1].pop(i),)+t[0],t[1]),s:=shortduce(lambda t: (lambda m,d: (((m,)+t[0],d,t[2]+1),d))(*moddiv(t[1],t[2])),i=((),t,1))[0],((),list(range(len(s)))))[0] if type(t)==int else tuple(fromCycles(t) if t and isinstance(t[0],Iterable) else t)
     p.internal=(nicerm if nice else perm)(factoradic(t)) if type(t)==int else tuple(fromCycles(t) if t and isinstance(t[0],Iterable) else t)
+    if n!=None: p.internal.extend(range(len(p.internal),n))
   #various other things
   '''
     __int__=(lambda p: sum(starmap(int.__mul__,enumerate(reversed(tuple(starmap(lambda i,t: t-smp(t.__gt__,p[:i]),enumerate(p)))),start=1))))
@@ -261,6 +262,73 @@ class permutation:
   #parity=(lambda p,b=None: reduce(lambda c,d: c^~len(d)&1,p.cycles(),0) if b==None else permutation.parity(tap(p.index,b))) #O(n*lg(n)) (lg due to hashtables) instead of O(n**2) #may be computing that of inverse but parity is irrespective
   parity=(lambda p,b=None: (len(p)^p.cycles(2))&1 if b==None else permutation.parity(tap(p.index,b)))
   sgn=lambda *p: (-1)**parity(*p)
+
+class permutations_int:
+  def __init__(s,n=None,curr=None,nice=False):
+    s.nice=nice
+    s.n=n
+    s.len=None if n==None else fact(n)
+    s.current=permutation(0 if curr==None else curr,n)
+  __len__=lambda s: s.len
+  getter=lambda s,i: permutation(i,s.n,True) if s.nice else permutation(tap(lambda j: s.n+~j,permutation(i,s.n)[::-1]))
+  __getitem__=lambda s,i: expumulate(s.succ,(i.stop if s.n==None else len(s) if i.stop==None else min(i.stop,len(s)))+~(i.start or 0))(s.getter(i.start or 0)) if type(i)==slice else s.getter(i)
+  index=lambda s,p: unfactoradic(unnicerm(p) if s.nice else unperm(tap(lambda j: s.n+~j,p[::-1])))
+  def succ(s,p):
+    p=list(p.internal)
+    n=len(p) if s.n==None else s.n
+    if s.nice:
+      inv=len(p)*[0]
+      for i in range(len(p)): inv[p[i]]=i
+      f=len(p)*[0]
+      for i in range(len(p)):
+        if (l:=p.pop())!=len(p)>0:
+          f[~i]=len(p)-l
+          p[d:=inv[len(p)]]=l
+          inv[l]=d
+        if f[~i]<n+~i:
+          f[~i]+=1
+          f[n-i:]=[0]*i
+          break
+      else: raise StopIteration
+      p.extend(list(range(n+~i,n)))
+      inv[~i:]=list(range(n+~i,n))
+      for i,m in enumerate(f[~i:],start=n+~i):
+        exchange(p,i,inv[i-m])
+        exchange(inv,p[inv[i-m]],i-m)
+    else:
+      tree=fenwick(lap(lambda i: 0,range(n)),raw=True)
+      f=n*[0]
+      for i in range(n):
+        tree[p[~i]]=1
+        f[~i]=tree.sum(p[~i])
+        if f[~i]<i:
+          f[~i]+=1
+          f[n-i:]=[0]*i
+          break
+      else:
+        raise StopIteration
+      for i in revange(i+1):
+        d=tree.index(f[~i])
+        p[~i]=d
+        tree[d]=0
+    return permutation(p)
+  def __iter__(s):
+    for i in range(len(s)):
+      yield s.current
+      if i<len(s)-1: s.current=s.succ(s.current)
+
+class permutations:
+    def __init__(s,N,curr=None,nice=False):
+        s.N=N
+        s.n=len(N)
+        s.len=fact(s.n)
+        s.internal=permutations_int(s.n,None if curr==None else give(curr),nice=False)
+    give=lambda s,i: tap(s.N.index,i)
+    take=lambda s,o: tap(s.N.__getitem__,o)
+    __len__=lambda s: s.len
+    __getitem__=lambda s,i: (maph(s.take) if type(i)==slice else s.take)(s.internal[i])
+    index=lambda s,o: s.internal.index(s.give(o))
+    __iter__=lambda s: map(s.take,s.internal[:len(s)])
 
 #fromCycles=lambda c: permutation(reduce(lambda r,i: r+(lambda t: t and (t[-1],)+t[:-1])(tuple(range(l:=r[-1]+1 if r else 0,l+i))),c,())) #for representatives
 fromCycles=lambda c: fromCycles(*c) if isinstance(c[0][0],Iterable) else reduce(lambda p,c: reduce(lambda p,i: p[:i[0]]+(i[1],)+p[i[0]+1:],zip(c,chain(c[1:],(c[0],))),p),c,tuple(range(smp(len,c))))
