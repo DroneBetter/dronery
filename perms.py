@@ -5,6 +5,19 @@ from dronery.common import*
 from dronery.poly import x
 from sympy import primerange
 
+
+def algL_iterate(seq): #thank you Narayana followed by Knuth followed by https://stackoverflow.com/a/12837695
+  for k in revange(len(seq)-1):
+    if seq[k]<seq[k+1]: break
+  else: raise StopIteration
+  k_val=seq[k]
+  for i in revange(len(seq)):
+    if k_val<seq[i]: break
+  (seq[k],seq[i])=(seq[i],seq[k])
+  seq[k+1:]=seq[-1:k:-1]
+  return seq
+
+
 def permutiterator(n): #uses Steinhaus-Johnson-Trotter; iterates through 'Gray code of permutations'
   perm = lap(list,zip(range(n),[1]*n)) #1ness represents leftwardness
   cand=True
@@ -296,21 +309,7 @@ class permutations_int:
         exchange(p,i,inv[i-m])
         exchange(inv,p[inv[i-m]],i-m)
     else:
-      tree=fenwick(lap(lambda i: 0,range(n)),raw=True)
-      f=n*[0]
-      for i in range(n):
-        tree[p[~i]]=1
-        f[~i]=tree.sum(p[~i])
-        if f[~i]<i:
-          f[~i]+=1
-          f[n-i:]=[0]*i
-          break
-      else:
-        raise StopIteration
-      for i in revange(i+1):
-        d=tree.index(f[~i])
-        p[~i]=d
-        tree[d]=0
+      p=algL_iterate(p)
     return permutation(p)
   def __iter__(s):
     for i in range(len(s)):
@@ -322,7 +321,7 @@ class permutations:
         s.N=N
         s.n=len(N)
         s.len=fact(s.n)
-        s.internal=permutations_int(s.n,None if curr==None else give(curr),nice=False)
+        s.internal=permutations_int(s.n,None if curr==None else give(curr),nice)
     give=lambda s,i: tap(s.N.index,i)
     take=lambda s,o: tap(s.N.__getitem__,o)
     __len__=lambda s: s.len
