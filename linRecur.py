@@ -7,7 +7,6 @@ from operator import __mul__
 from https://gist.github.com/hepheir/6e1a830211829b4119797a4ca5b1a3de which in turn is
 from https://gist.github.com/koosaga/d4afc4434dbaa348d5bef0d60ac36aa4
 albeit now it is endronulated
-everything can also work modulo a prime p
 '''
 def ogfDenom(l,p=None): #known as the Berlekamp-Massey algorithm
     #given 2*n terms of a sequence, finds the denominator of the rational o.g.f. with length-n num and denom
@@ -35,29 +34,19 @@ def ogfDenom(l,p=None): #known as the Berlekamp-Massey algorithm
 #gf=lambda l: polyfrac((l[:len(o:=1-x*ogfDenom(l))]*polynomial(o))[:len(o)],o)
 gf=lambda l: polyfrac((l[:len(d:=ogfDenom(l))+2]*(o:=1-x*d))[:len(d)+2],o)
 
-
-def nthTerm(denom,num,n,p=None): #see https://oeis.org/wiki/User:Natalia_L._Skirrow/linear_recurrence
-    sm=modsum(p) if p else sum
-    mopt=lambda c: c%p if p else c
+def nthTerm(denom,num,n): #denom in normalised form as outputted by ogfDenom
     m=len(denom)
-    moned=polynomial(denom[::-1])
-    s,t=[0]*m,[0]*m
-    s[0]=1
-    if m!=1: t[1]=1
-    else: t[0]=denom[0]
-    def mul(v,w):
-        m=len(v)
-        t=lap(mopt,polynomial.__mul__(v,w))
-        while len(t)>m: t=lap(mopt,t[:-1]+(t[-1]*moned<<len(t)+~m))
-        return t+[0]*(m-len(t))
+    moned=x**m-denom[::-1]
+    s=[1]+[0]*(m-1)
+    t=[denom[0]] if m==1 else [0]+[1]+[0]*(m-2)
+    mul=lambda v,w: fixlen(fixlen(polynomial.__mul__(v,w),2*m-1)%moned,m)
     while n:
         if n&1: s=mul(s,t)
         t=mul(t,t)
         n>>=1
-    return sm(map(__mul__,s,num))
+    return dot(s,num)
 
 nthTermGuess=lambda l,n: l[n] if n<len(l) else int(bool(v:=ogfDenom(l))) and nthTerm(v,l,n)
-
 
 def fibonacci(k): #not faster (in terms of arithmetic) than using nacci(2,k) listed below, just unravelled and idiomatised for sharing
     a,b=(0,1)

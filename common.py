@@ -7,7 +7,7 @@ from copy import copy,deepcopy
 from random import randrange,choice,shuffle
 
 from operator import __add__,__neg__,__sub__,__mul__,__floordiv__,__truediv__,__eq__,__or__,__gt__
-from math import gcd as mathgcd,lcm as mathlcm,isqrt,sqrt,cbrt,cos,tan,sin,acos,asin,atan,atan2,e,pi,hypot,dist,log
+from math import gcd as mathgcd,lcm as mathlcm,isqrt,sqrt,cbrt,cos,tan,sin,acos,asin,atan,atan2,e,pi,hypot,dist,log,perm
 def ilog(n,b):
     if b==1!=n:
         return(ValueError('you cannot take log base 1'))
@@ -86,7 +86,7 @@ _transmissing=object()
 transpose=lambda l: map(filterh(rne(_transmissing)),zip_longest(*l,fillvalue=_transmissing)) #this way we can transpose Young tableau too
 transpose_longest=lambda l,fillvalue=0: map(taph(lambda x: fillvalue if x==None else x),zip_longest(*l))
 grouper=lambda i,n: zip(*(n*(iter(i),))) #what the heck
-revange=lambda a,b=None,c=1: range(b-c,a-c,-c) if b else range(a-c,-c,-c) #reversed range (very inelegant) #(lambda *a: reversed(range(*a))) #it will get its revange, just you wait
+revange=lambda a,b=None,c=1: range(a-c,-c,-c) if b==None else range(b-c,a-c,-c) #reversed range (very inelegant) #compose(range,reversed) #it will get its revange, just you wait
 fracrange=lambda a,b=None,c=1: redumulate(lambda r,i: r+c,*((range(int(b-a)-1),a)  if b else (range(int(a)-1),0)))
 redumulate=lambda f,l,i=None: accumulate(l,f,initial=i)
 
@@ -158,7 +158,33 @@ subfact=lambda n: smp(lambda k: comb(~k,~n)*fact(k),range(n+1))
 factxcept=lambda n,p,q: ((-1)**(n//p**q) if p!=2 or q==2 else 1)*modprod(p**q)(map(lambda i: ((i+1)*p-1)//(p-1),range((n%p**q+1)*(p-1)//p)))%p**q #helper function for modular variations later
 from sympy import primefactors
 factval=lambda n,b: min(starmap(lambda p,e: smp(lambda i: n//p**i,range(1,ilog(n,p)+1))//e,factorint(b).items())) #Legendre's formula
-invfact=(lambda n,i=2: n and invfact(n//i,i+1)+1) #A084558
+oldinvfact=lambda n,i=2: n and oldinvfact(n//i,i+1)+1 #A084558
+def invfact(n,ceil=False):
+  if n<=0: raise ValueError('n must be >=1')
+  low=0
+  #up=1
+  for i in count(1):
+    low+=i<<i  #= i-1<<i+1|2 <= log₂(fact(2ⁱ⁺¹))
+    if low>=n.bit_length()-1: break
+    #up+=i+1<<i #= i<<i+1|1 >= log₂(fact(2ⁱ⁺¹))
+  #assert(up == i-1<<i|1)
+  i-=n.bit_length()<=i-1<<i|1 #up >= log₂(fact(2ⁱ))
+  #so n.bit_length() = ⌊log₂(n)⌋+1 > up => ⌊log₂(n)⌋ >= log₂(fact(2ⁱ)) => n >= fact(2ⁱ)
+  n//=fact(1<<i)
+  for i in count(i+1):
+    if i-1<<i-1>=n.bit_length()-1: break #replace each of the 1<<i-1 multiplicands with lower bound 1<<i-1; a sufficient but not necessary criterion for second (note that this being satisfied precludes the second check having inequality)
+    if (f:=falling(1<<i,1<<i-1))>=n:
+      if f==n: return 1<<i
+      break
+    n//=f
+  s=1<<i-1
+  for i in revange(i-1):
+    if s.bit_length()-1<<i < n.bit_length() and (f:=rising(s|1,1<<i))<=n:
+      s|=1<<i
+      if f==n: return s
+      n//=f
+  return s+ceil
+
 multifact=lambda n,k: prod(range((n-1)%k+1,n+1,k))
 
 factoriactors=lambda n: shortduce(lambda n,k: (k-1,False) if n%k else (n//k,True),range(2,n),n) #greatest k such that k! divides n
@@ -166,7 +192,7 @@ comb=choose=lambda n,*k: (lambda n,*k: (-1)**abs(sum(k:=k[:(i:=k.index(min(k)))]
 #choose=lambda n,k: comb(n,k) if n>=0 else (-1)**(-n-k)*comb(~k,~n) if k<0 else (-1)**k*comb(k+~n,k)
 multichoose=lambda n,*k: comb(n+sum(k)-1,*k)
 
-falling=lambda n,k: prod(map(lambda i: n-i,range(k))) if type(n)==frac and type(k)==int else ((frac((-1)**-k*fact(k+~n),fact(~n)) if k<0 else n<0 and (-1)**k*fact(k+~n)//fact(~n)) if n<k else (n>=0 and frac(fact(n),fact(n-k)) if k<0 else fact(n)//fact(n-k))) if all(map(lambda x: type(x) not in {float,complex},(n,k))) else (-1)**n*gamma(-n+k)/gamma(-n) if type(n)==int and n<0 else gamma(n+1)/gamma(n+1-k)
+falling=lambda n,k: prod(map(lambda i: n-i,range(k))) if type(n)==frac and type(k)==int else ((frac((-1)**-k*fact(k+~n),fact(~n)) if k<0 else n<0 and (-1)**k*perm(k+~n,k)) if n<k else (n>=0 and frac(fact(n),fact(n-k)) if k<0 else perm(n,k))) if all(map(lambda x: type(x) not in {float,complex},(n,k))) else (-1)**n*gamma(-n+k)/gamma(-n) if type(n)==int and n<0 else gamma(n+1)/gamma(n+1-k)
 rising=lambda n,k: prod(map(lambda i: n+i,range(k))) if type(n)==frac and type(k)==int else (-1)**abs(k)*falling(-n,k) if all(map(lambda x: type(x) not in {float,complex},(n,k))) else (-1)**n*gamma(1-n)/gamma(1-n-k) if type(n)==int and n<0 else gamma(n+k)/gamma(n)
 lah=lambda n,k: not n==0<k and comb(n-1,k-1)*falling(n,n-k)
 A001263=narayana=lambda n,k: k and comb(n-1,k-1)*comb(n,k-1)//k
@@ -319,21 +345,37 @@ class fenwick:
   # iterations until is next power of 2: (i-1).bit_length()-(i-1).bit_count()
   # iterations until >=n: (n-1-(c:=n&(1<<(n-1).bit_length()-1)-(1<<(n-1^i-1).bit_length()-1))).bit_length()-(i-1-c).bit_count()
   def __init__(f,l,raw=False):
-    f.tree=l
-    if not raw:
-      for i in range(len(l)):
-        j=i|i+1
-        if j<len(l): f.tree[j]+=f.tree[i]
+    if type(l)==int:
+      f.tree=lap(lambda i: i+1&~i,range(l))
+    else:
+      f.tree=l
+      if not raw:
+        for i in range(len(l)):
+          j=i|i+1
+          if j<len(l): f.tree[j]+=f.tree[i]
   def flatten(f):
     flat=copy(f.tree)
     for i in revange(len(f)):
       j=i|i+1
       if j<len(f): flat[j]-=flat[i]
-    return(flat)
+    return flat
   __repr__=lambda f: str(f.flatten())
-  sum=lambda f,i=None: f.sum(len(f)) if i==None else i>0 and smp(f.tree.__getitem__,redumulate(lambda i,_: (i&i+1)-1,range(i.bit_count()-1),i-1)) #upper-exclusive
+  def sum(f,i=None): #upper-exclusive
+    if i==None: i=len(f)
+    out=0
+    j=i
+    for _ in range(i.bit_count()):
+      out+=f.tree[j-1]
+      j&=j-1
+    return out
   __len__=lambda f: len(f.tree)
-  __getitem__=lambda f,i: f.sum(i+1)-f.sum(i)
+  def __getitem__(f,i):
+    out=f.tree[i]
+    j=i
+    while j!=i&i+1:
+      out-=f.tree[j-1]
+      j&=j-1
+    return out
   def __setitem__(f,i,p):
     p-=f[i]
     n=len(f)

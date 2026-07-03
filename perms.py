@@ -32,14 +32,16 @@ def permutiterator(n): #uses Steinhaus-Johnson-Trotter; iterates through 'Gray c
     for p in perm:
       if p[0]>cand: p[1]^=1
 
-def factoradic(n,l=None):
-  f=[]
-  d=1
-  while n:
-    f.append(n%d)
-    n//=d
-    d+=1
-  return f+[0]*(l!=None and l-len(f))
+def factoradic(index,n=None,r=None): #returns length-(n-r) list whose i-th element is in range(r+i), of which there are falling(n,r) many
+  if n==None: n=invfact(index)+1 if index else 1
+  if r==None: r=n
+  split=[index]
+  for depth in range(1,l:=r.bit_length()+1):
+    prev,split = split,[0]*((r-1>>l+~depth)+1)
+    for i,s in enumerate(prev):
+      d,split[2*i]=divmod(s,falling(n-r+(2*i+1<<l+~depth),1<<l+~depth))
+      if d: split[2*i+1] = d
+  return split
 unfactoradic=lambda f: dot(f,redumulate(int.__mul__,range(1,len(f)),1)) #do not use sum(starmap(lambda i,d: fact(i)*d,enumerate(f)))
 '''def perm(f,n=None): #O(n**2) due to list.pop being O(n)
   if n==None: n=len(f)
@@ -55,7 +57,7 @@ def unperm(p): #O(n**2)
 
 def perm(f,n=None): #O(n*log(n) :-)
   if n==None: n=len(f)
-  tree=fenwick(lap(lambda i: i+1&~i,range(n)),raw=True)
+  tree=fenwick(n)
   p=len(f)*[0]+list(range(len(f),n))
   for i in range(n-len(f),n):
     p[~i]=tree.index(j:=n-i+~f.pop())
@@ -63,7 +65,7 @@ def perm(f,n=None): #O(n*log(n) :-)
   return p
 def unperm(p): #O(n*log(n) :-)
   n=len(p)
-  tree=fenwick(lap(lambda i: i+1&~i,range(n)),raw=True)
+  tree=fenwick(n)
   f=n*[0]
   for i in range(n):
     tree[p[~i]]=0
@@ -281,7 +283,7 @@ class permutations_int:
     s.nice=nice
     s.n=n
     s.len=None if n==None else fact(n)
-    s.current=permutation(0 if curr==None else curr,n)
+    s.current=permutation(0 if curr==None else curr,n,nice=nice)
   __len__=lambda s: s.len
   getter=lambda s,i: permutation(i,s.n,True) if s.nice else permutation(tap(lambda j: s.n+~j,permutation(i,s.n)[::-1]))
   __getitem__=lambda s,i: expumulate(s.succ,(i.stop if s.n==None else len(s) if i.stop==None else min(i.stop,len(s)))+~(i.start or 0))(s.getter(i.start or 0)) if type(i)==slice else s.getter(i)
