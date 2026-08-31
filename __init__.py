@@ -15,7 +15,8 @@ from dronery.linRecur import*
 from dronery.numthy import*
 from dronery.perms import*
 
-
+Expect=lambda t: frac((p:=polynomial(t)).diff()(1),sum(t))
+Var=lambda t: frac((p:=polynomial(t)).diff().diff()(1),sum(t))-falling(frac(p.diff()(1),sum(t)),2)
 
 def continuedsqrt(n): #continued fraction
     s=isqrt(n)

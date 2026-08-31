@@ -2,22 +2,47 @@ dbg=lambda x,*s: (x,print(*s,x))[0] #debug
 _stree=lambda n: lambda t: '\n'.join(map(lambda a: _stree(n+1)(a) if isinstance(a,Iterable) and type(a)!=str else ' '*n+str(a),t))
 stree=_stree(0)
 
-from functools import reduce,lru_cache
+from functools import reduce,cache,lru_cache
 from copy import copy,deepcopy
 from random import randrange,choice,shuffle
 
 from operator import __add__,__neg__,__sub__,__mul__,__floordiv__,__truediv__,__eq__,__or__,__gt__
 from math import gcd as mathgcd,lcm as mathlcm,isqrt,sqrt,cbrt,cos,tan,sin,acos,asin,atan,atan2,e,pi,hypot,dist,log,perm
-def ilog(n,b):
+"""def ilog(n,b=2):
+    min,max=0,1
+    acc=b
+    while acc<=n:
+        acc**=2
+        min=max
+        max<<=1
+    '''if acc==n:
+        return(max)
+    else:''' #indent all thereafter
+    #if True:
+    change=min>>1
+    while change:
+        max=acc//b**change
+        if max<=n:
+            acc=max
+            min+=change
+        change>>=1
+    return(min)
+    '''else:
+        while max+~min:
+            mid=max+min>>1
+            if b**mid>n: max=mid
+            else: min=mid
+        return(min)'''""" #from OEIS, however I don't think bisection is more efficient when exponentiation takes time proportional to output length
+def ilog(n,b=2):
     if b==1!=n:
-        return(ValueError('you cannot take log base 1'))
+        raise(ValueError('base-1 logarithm does not exist'))
     elif b&b-1:
         i=0
         while n>1:
             n//=b
             i+=1
-        return(i-(not n))
-    else: return((n.bit_length()-1)//(b.bit_length()-1))
+        return i-(not n)
+    else: return (n.bit_length()-1)//(b.bit_length()-1)
 moddiv=lambda a,b: a.moddiv(b) if type(a)==__import__('dronery.poly').polynomial else divmod(a,b)[::-1]
 from itertools import starmap,accumulate,groupby,product,permutations,chain,pairwise,zip_longest,count,islice
 
@@ -83,12 +108,12 @@ A231536=lambda n,k: fact(n)//fact(k)*smp(lambda j: fact(n-1)//fact(j)*(n-j)*subs
 rne=lambda a: lambda b: b!=a
 #transpose=lambda l: zip(*l)
 _transmissing=object()
-transpose=lambda l: map(filterh(rne(_transmissing)),zip_longest(*l,fillvalue=_transmissing)) #this way we can transpose Young tableau too
+transpose=lambda l: map(tilterh(rne(_transmissing)),zip_longest(*l,fillvalue=_transmissing)) #this way we can transpose Young tableau too
 transpose_longest=lambda l,fillvalue=0: map(taph(lambda x: fillvalue if x==None else x),zip_longest(*l))
 grouper=lambda i,n: zip(*(n*(iter(i),))) #what the heck
 revange=lambda a,b=None,c=1: range(a-c,-c,-c) if b==None else range(b-c,a-c,-c) #reversed range (very inelegant) #compose(range,reversed) #it will get its revange, just you wait
-fracrange=lambda a,b=None,c=1: redumulate(lambda r,i: r+c,*((range(int(b-a)-1),a)  if b else (range(int(a)-1),0)))
-redumulate=lambda f,l,i=None: accumulate(l,f,initial=i)
+fracrange=lambda a,b=None,c=1: scan(lambda r,i: r+c,*((range(int(b-a)-1),a)  if b else (range(int(a)-1),0)))
+redumulate=scan=lambda f,l,i=None: accumulate(l,f,initial=i)
 
 maph=(lambda f: lambda *i: map(f,*i));starmaph=lambda f: lambda *l: starmap(f,*l) #in the convention of the hyperbolic functions, for currying (just like Haskell used to make :-)
 filterh=lambda f: lambda *i: filter(f,*i);tilterh=lambda f: lambda *i: tuple(filter(f,*i))
@@ -103,7 +128,7 @@ lilter=lambda f,i: list(filter(f,i))
 stax=lambda i,key=None: max(i,key=None if key==None else lambda i: key(*i))
 chap=lambda f,*i: chain.from_iterable(map(f,*i));chaph=lambda f: lambda *i: chain.from_iterable(map(f,*i));charmap=lambda f,*i: chain.from_iterable(starmap(f,*i))
 compose=lambda *f: lambda *a: reduce(lambda a,f: (lambda i,f: f(a) if i else f(*a))(*f),enumerate(f),a)
-#(funcxp,expumulate)=map(lambda f: eval("lambda f,l: lambda i: "+f+"(lambda x,i: f(x),range(l),i)"),("reduce","redumulate")) #unfortunately has overhead
+#(funcxp,expumulate)=map(lambda f: eval("lambda f,l: lambda i: "+f+"(lambda x,i: f(x),range(l),i)"),("reduce","scan")) #unfortunately has overhead
 funcxp=(lambda f,l: lambda i: reduce(lambda x,i: f(x),range(l),i)) #short for funcxponentiate
 stuncxp=consxp=(lambda f,l: lambda i: reduce(lambda x,i: f(*x),range(l),i)) #short for starfuncxp or consxponentiate
 expumulate=lambda f,l: lambda i: accumulate(range(l),lambda x,i: f(x),initial=i) #inlined, expumulate(f,l)(i) is equivalent to map(lambda n: funcxp(f,n)(i),range(l))
@@ -188,7 +213,8 @@ def invfact(n,ceil=False):
 multifact=lambda n,k: prod(range((n-1)%k+1,n+1,k))
 
 factoriactors=lambda n: shortduce(lambda n,k: (k-1,False) if n%k else (n//k,True),range(2,n),n) #greatest k such that k! divides n
-comb=choose=lambda n,*k: (lambda n,*k: (-1)**abs(sum(k:=k[:(i:=k.index(min(k)))]+k[i+1:]))*comb(sum(k)+~n,*k) if n<0 else int(all(map((0).__le__,k)) and fact(n)//prod(map(fact,k))))(n,*k,n-sum(k)) if type(n)==int and all(map(lambda i: type(i)==int,k)) else fact(n)/prod(map(fact,k))/fact(n-sum(k))
+comb=choose=lambda n,*k: (lambda n,*k: (-1)**abs(sum(k:=k[:(i:=k.index(min(k)))]+k[i+1:]))*comb(sum(k)+~n,*k) if n<0 else int(all(map((0).__le__,k)) and fact(n)//prod(map(fact,k))))(n,*k,n-sum(k)) if type(n)==int and all(map(lambda i: type(i)==int,k)) else fact(n)/prod(map(fact,k))/fact(n-sum(k)) #sometimes the numerator is O(log(n)) times larger than the frac (ie. central binom coeffs); make this less slow for such cases
+A068555=lambda n,k: comb(2*k,k)*comb(n-k<<1,n-k)//comb(n,k)
 #choose=lambda n,k: comb(n,k) if n>=0 else (-1)**(-n-k)*comb(~k,~n) if k<0 else (-1)**k*comb(k+~n,k)
 multichoose=lambda n,*k: comb(n+sum(k)-1,*k)
 
@@ -212,8 +238,9 @@ Delta=forwardDifferences=lambda f,n=1: lambda k: smp(lambda i: comb(~i,~n)*f(k+i
 subset_int=lambda n,k: (__floordiv__ if type(n)==int else __truediv__)(forwardDifferences(lambda i: i**n,k)(0),fact(k))
 #subset_int=lambda n,k: smp(lambda i: comb(~i,~k)*i**n,range(k+1))//fact(k)
 #subset_int=lambda n,k: smp(lambda i: comb(-i,-k)*i**(n-1),range(1,k+1))//fact(k-1) #decrement choose by removing mutual factors for extremely marginal speedup
-#subset_int=lambda n,k: srmp(lambda i,c: c*i**n,enumerate(redumulate(lambda r,i: r*(i+~k)//i,range(1,k+1),(-1)**k)))//fact(k) #better way (using (-1)**(k-i)*comb(k,i)=comb(k,i-1)*(i+~k)//i (exceedingly fast))
-subset_int=lambda n,k: srmp(lambda i,c: c*(i+1)**(n-1),enumerate(redumulate(lambda r,i: r*(i-k)//i,range(1,k),(-1)**(k-1))))//fact(k-1) #combining both optimisations
+#subset_int=lambda n,k: srmp(lambda i,c: c*i**n,enumerate(scan(lambda r,i: r*(i+~k)//i,range(1,k+1),(-1)**k)))//fact(k) #better way (using (-1)**(k-i)*comb(k,i)=comb(k,i-1)*(i+~k)//i (exceedingly fast))
+#subset_int=lambda n,k: srmp(lambda i,c: c*(i+1)**(n-1),enumerate(scan(lambda r,i: r*(i-k)//i,range(1,k),(-1)**(k-1))))//fact(k-1) #combining both optimisations
+subset_int=lambda n,k: ((r:=(-1)**(k-1))+sum((r:=r*(i-k)//i)*(i+1)**(n-1) for i in range(1,k)))//fact(k-1) #neater and better overheadwise
 #r-Stirling numbers (see https://doi.org/10.1016/0012-365X(84)90161-4)
 rsubset_int=lambda r,n,k: k>=r and smp(lambda i: comb(~i,r+~k)*frac(i+r)**(n-r),range(k-r+1))//fact(k-r) if type(r)==int and 0<=k and (0<=r or k<0 or n-r>=0) else sum(map(lambda i: comb(int(n-r),int(k+i-r))*subset(int(k+i-r),int(k-r))*r**(n-k-i),range(int(n-k)+1))) #supporting extension to negative n and positive k by default! #warning! if r is fractional, n and k must have the same fractional part
 #alternatively, smp(lambda i: comb(~i,~k)*frac(i)**(n-r)*falling(i,r),range(r,k+1))/fact(k) (equation 32)
@@ -221,9 +248,9 @@ rcycle_int=lambda r,n,k: smp(lambda i: comb(int(n-r),int(k-r)+i)*cycle(int(k-r)+
 '''see also subset_recolumnce in __init__ (which transpires to be much slower actually)'''
 #Stirling numbers of the first kind
 #cycle_int=lambda n,k: smp(lambda i: comb(-k,-i)*comb(2*n-k,i)*subset(i-k,i-n),range(n,2*n+1-k))
-#cycle_int=lambda n,k: srmp(lambda i,c: c*subset(i-k,i-n),enumerate(redumulate(lambda r,i: r*(1-i)*(2*n+1-k-i)//i//(i-k),range(n+1,2*n+1-k),(-1)**(k+n)*fact(2*n-k)//(n*fact(k-1)*fact(n-k)**2)),start=n))
-cycle_int=lambda n,k: srmp(lambda i,c: c*subset(i+n-k,i),     enumerate(redumulate(lambda r,i: r* (i+n)*(n-k-i)//(i+n+1)//(k+~n-i),                                                                     range(n-k), (-1)**   (k+n)* fact(2*n-k)//(n*fact(k-1)*fact(n-k)**2)))) 
-cycle_int=lambda n,k: srmp(lambda i,c: c*subset(i+int(n-k),i),enumerate(redumulate(lambda r,i: r*(i+n)*(n-k-i)//(i+n+1)//(k+~n-i) if type(n)==type(k)==int else r*frac((i+n)*(n-k-i),(i+n+1)*(k+~n-i)),range(int(n-k)),(-1)**int(n-k)*(fact(2*n-k)//(n*fact(k-1)*fact(n-k)**2) if type(n)==type(k)==int else frac(falling(2*n-k,2*(n-k))*k,n*fact(n-k)**2))))) #due to https://oeis.org/wiki/User:Natalia_L._Skirrow/a_nicer_hypergeometric_formulation#an_umbral_hypergeometric_for_polynomial_interpolation; it also works when n and k have the same fractional part
+cycle_int=lambda n,k: (r:=(-1)**(k+n)*choose(2*n-k,k,n-k)*k)*(n==k)//n+sum((r:=r*(n-k-i+1)//(k-n-i))//(i+n)*subset(i+n-k,i) for i in range(1,n-k+2))
+cycle_int=lambda n,k: ((r:=(-1)**(n-k)*choose(2*n-k,k,n-k)*k)*(n==k)//n if (o:=type(n)==type(k)==int) else (r:=(-1)**int(n-k)*frac(falling(2*n-k,2*int(n-k)),fact(int(n-k))**2)*k)*(n==k)/n)+sum(((r:=r*(n-k-i+1)//(k-n-i))//(i+n) if o else (r:=r*(n-k-i+1)/(k-n-i))/(i+n))*subset(i+int(n-k),i) for i in range(1,int(n-k)+1)) #due to https://oeis.org/wiki/User:Natalia_L._Skirrow/a_nicer_hypergeometric_formulation#an_umbral_hypergeometric_for_polynomial_interpolation; it also works when n and k have the same fractional part
+#for instance, A039821=lambda n: int(cycle_int(frac(1,2),frac(1,2)-n)*2**(4*n-1))
 subset=lambda n,k,above=False: int((cycle(-k,-n)) if n<0 else subset_int(n,k) if k>0 else n==0==k) if k<=n else int(k>=0>=n and above) and frac(forwardDifferences(lambda i: i and frac(1,i**-n),k)(0),fact(k))
 cycle=lambda n,k: int(k<=n and (subset(-k,-n) if n<0 else cycle_int(n,k) if k>0 else n==0==k))
 surjpow=surjectpow=lambda k,n,above=False: subset(n,k,above=above)*fact(k) #https://arxiv.org/abs/2501.08762
@@ -249,14 +276,17 @@ def stirlumerate(n,k,kind=False):
 
 eulerian =lambda n,k,ind=1: smp(lambda i: (-1)**   i *comb(n+1,i)*(k+1-ind-i)**n,range(k+1-ind)) if k>=ind else not n #ind=0 for Euler/Knuth's convention, ind=1 for Comtet's
 #eulerian2=lambda n,k: smp(lambda i: (-1)**   i *comb(2*n+1,i)*cycle(n+m-i,m-i),range(m:=n-k+1)) #do not use this one; current cycle implementation less efficient than its subset
-eulerian2=lambda n,k: smp(lambda i: (-1)**(k-i)*comb(2*n+1,k-i)*subset(n+i,i),range(k+1)) #second-order Eulerians, as seen in the numerators of both Stirling triangles' diagonals' g.f.s' nums
+eulerian2=A008517=lambda n,k: smp(lambda i: (-1)**(k-i)*comb(2*n+1,k-i)*subset(n+i,i),range(k+1))
+#second-order Eulerians, as seen in the numerators of both Stirling triangles' diagonals' g.f.s' nums
 #subset(d+k,k)=smp(lambda i: comb(d+k+i,2*d)*eulerian2(d,d-i),range(d+1))
 # cycle(d+k,k)=smp(lambda i: comb(d+k+i-1,2*d)*eulerian2(d,i),range(d+1))
+#note that this is the convention adopted by the OEIS (A008517) but NOT by Concrete Mathematics, which uses \langle{n\atop k}\rangle to denote A008517(n,k+1)
 cycle2 =lambda n,k: forwardDifferences(lambda j: cycle(j,j-n+k),n)(0)
 A162973=lambda n: smp(lambda k: k*cycle2(n,k),range(n//2+1))
-subset2=lambda n,k: forwardDifferences(lambda j: subset(j,j-n+k),n)(0)
+#subset2=lambda n,k: forwardDifferences(lambda j: subset(j,j-n+k),n)(0)
+subset2=A008299=lambda n,k: sum(comb(n,i)*(-1)**(n-i)*subset(i,i-n+k) for i in range(n-k,n+1))
 
-harmonic=harm=lambda n,o=1: frac(smp(lambda i: frac(1,i**o),range(1,n+1))) #put here in particular because (for k>=2) cycle(n,k)=smp(lambda i: harm(n-1,i+1)*(-1)**i*cycle(n,k+~i),range(k))//(k-1)
+harmonic=harm=lambda n,o=1: frac(smp(lambda i: frac(1,i)**o,range(1,n+1))) #put here in particular because (for k>=2) cycle(n,k)=smp(lambda i: harm(n-1,i+1)*(-1)**i*cycle(n,k+~i),range(k))//(k-1)
 
 bij=lambda n,k: smp(lambda i: (-1)**i*cycle(n+1,n+1-i)*smp(lambda j: (-1)**(n-j)*comb(n,j)*subset(k-i+j,j),range(n+1)),range(n+1))
 bij=lambda n,k: smp(lambda i: comb(n,i)*smp(lambda j: (-1)**abs(j)*cycle(i+1,1+j)*lah(n-i,n-k-j),range(i-k,i+1)),range(n+1))
@@ -273,6 +303,27 @@ faa=lambda f,g,egf=False: lambda n: smp(lambda p: frac(f(len(p)),fact(len(p)) if
 #A048172=lambda n: egfexp(A058349)(n)-(n==0)-A058349(n)
 A000262=egfexp(lambda n: n and fact(n))
 
+def accel_asc(n): #(thank you https://jeromekelleher.net/generating-integer-partitions.html ;-)
+    if n:
+        a=lap(lambda _: 0,range(n+1))
+        k=1
+        y=n-1
+        while k:
+            k-=1
+            x=a[k]+1
+            while x<=y>>1:
+                a[k]=x
+                y-=x
+                k+=1
+            while x<=y:
+                a[k],a[k+1]=x,y
+                yield a[:k+2]
+                x+=1;y-=1
+            y+=x-1
+            a[k]=y+1
+            yield a[:k+1]
+    else: yield [] #returning ([],) rather than ([0],) makes many identities nicer; with it, comb(n-1,k-1)=smp(lambda p: len(p)==k and comb(len(p),*map(rgetitem(1),rle(p))),accel_asc(n)) works for comb(-1,-1)=1
+intPart=integerPartitions=accel_asc #for ordered, see diffcomb
 from sympy.utilities.iterables import multiset_permutations,multiset_partitions #note latter is equivalent to accel_asc
 #ordertitions=lambda C,K,P: lambda n,k: smp(lambda p: len(p)==k and (((comb(len(p),*map(rgetitem(1),rle(p))) if K==2 else len(sap(lambda p: tuple(min(map(lambda i: p[i:]+p[:i],range(k)))),multiset_permutations(p)))) if C else fact(len(p) if K==2 else len(p)-1)) if K else 1)*(prod(map(fact,p)) if P==2 else prod(map(lambda i: fact(i-1),p)) if P else 1),accel_asc(n)) if k else int(not n)
 #ordertitions=lambda K,P: lambda n,k: smp(lambda p: len(p)==k and (1 if K==0 else comb(len(p),*map(rgetitem(1),rle(p))) if K==2 else len(sap(lambda p: tuple(min(map(lambda i: p[i:]+p[:i],range(k)))),multiset_permutations(p))))*(1 if P==0 else prod(map(fact,p)) if P==2 else prod(map(lambda i: fact(i-1),p))),accel_asc(n)) if k else int(not n)
@@ -379,12 +430,17 @@ class fenwick:
   def __setitem__(f,i,p):
     p-=f[i]
     n=len(f)
-    for _ in range((n-(c:=n+1&~(~0<<n.bit_length()-1)&~0<<(n^i).bit_length()-1)).bit_length()-(i-c).bit_count()): #do NOT remove n+1& in c's definition or it will break, first such case is for i=24, n=25
+    #for _ in range((n-(c:=n+1&~(~0<<n.bit_length()-1)&~0<<(n^i).bit_length()-1)).bit_length()-(i-c).bit_count()): #do NOT remove n+1& in c's definition or it will break, first such case is for i=24, n=25
+    while i<n:
       f.tree[i]+=p
       i|=i+1
-  def index(f,val): #tells you the floor-index of val within the list of partial sums; ie. if f is a list of weights, val=randrange(f.sum()) lets you select from them uniformly
-    #bisecting using the sum operator would be O(log(n)**2) time; by mutating the sum inline we can do it in O(log(n))
-    #chooses the furthest-right element if multiple 0s cause multiple tying places in partial sum
+  def index(f,val):
+    '''returns the index of val within the list of partial sums; ie. if f is a
+    list of weights, val=randrange(f.sum()) lets you select from them uniformly.
+    bisecting using the sum operator would be ``O(log(n)**2)`` time;
+    by mutating the sum inline we can do it in ``O(log(n))``!
+    chooses furthest-right element if 0s cause indices to tie in partial sum.
+    '''
     i=0
     if len(f)==1: return int(val>=f[0])
     j=1<<(len(f)-1).bit_length()-1
@@ -398,40 +454,7 @@ class fenwick:
 from numbers import Number
 sgn=(lambda n,zerositive=False: n and (-1)**(n<0) or zerositive if isinstance(n,Number) else (lambda m: type(n)(tap(m.__rtruediv__,n)) if 0!=m!=1 else n)(hypot(*n)))
 
-"""def ilog(n,b=2):
-    min,max=0,1
-    acc=b
-    while acc<=n:
-        acc**=2
-        min=max
-        max<<=1
-    '''if acc==n:
-        return(max)
-    else:''' #indent all thereafter
-    #if True:
-    change=min>>1
-    while change:
-        max=acc//b**change
-        if max<=n:
-            acc=max
-            min+=change
-        change>>=1
-    return(min)
-    '''else:
-        while max+~min:
-            mid=max+min>>1
-            if b**mid>n: max=mid
-            else: min=mid
-        return(min)'''""" #from OEIS, however I don't think bisection is more efficient when exponentiation takes time proportional to output length
-def ilog(n,b=2):
-    if b==1!=n:
-        raise(ValueError('base-1 logarithm does not work'))
-    else:
-        i=0
-        while n>1:
-            n//=b
-            i+=1
-        return(i-(not n))
+
 if isqrtSequences:=True:
     A002024=(lambda n: isqrt(n<<3)+1>>1)
     A002260=(lambda n,b=False: (lambda s: (lambda o: (o,s-o) if b==2 else (o,s) if b else o)(n-s*(s-1)//2))(A002024(n))) #1-indexed antidiagonal coordinates

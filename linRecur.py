@@ -115,7 +115,7 @@ class polyfrac: #for representing rational functions as ordinary generating func
     __iter__=lambda f: map(lambda _: next(f),count())
     __len__=lambda f: len(f.expanded)
     __getitem__cachefully=lambda f,n: (f.expanded[n] if n<len(f.expanded) else Y(lambda g: lambda _: f.expanded[n] if n<len(f) else g(next(f)))(None))
-    __getitem__=lambda f,n: tap(f.__getitem__cachefully,range(n.start or 0,n.stop,n.step or 1)) if type(n)==slice else f.__getitem__cachefully(n) if f.cache else nthTerm(-f.b[1:],f.a,i)
+    __getitem__=lambda f,n: tap(f.__getitem__cachefully,range(n.start or 0,n.stop,n.step or 1)) if type(n)==slice else f.__getitem__cachefully(n) if f.cache else nthTerm(-f.b[1:],f.a,n)
     __add__=lambda a,b: (lambda b: (lambda l: polyfrac((a.num*l/a.den+b.num*l/b.den),l))(a.den.lcm(b.den)))(polyfrac(b))
     __mul__=lambda f,n: polyfrac(*((f.num*n,f.den) if type(n)==polynomial else (f.num*n.num,f.den*n.den) if type(n)==polyfrac else (tap(n.__mul__,f.num),f.den)))
     __rmul__=lambda f,n: f*n

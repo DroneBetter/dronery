@@ -27,10 +27,46 @@ sup=lambda i,supss=True: ''.join(map(lambda n: sups[int(n)],str(i))) if supss el
 desup=lambda s: ''.join(map(lambda s: '**'+''.join(map(compose(sups.index,str),s)) if s[0] in sups else s,Y(lambda f: lambda t,s,m,i: (f(t+(s[:i],),s[i:],not m,0) if (g:=s[i] in sups)!=m and (t or i) else f(t,s,g,i+1)) if i<len(s) else t+bool(s)*(s,))((),s,False,0)))
 denom=lambda p: lcm(*map(denom,p)) if isinstance(p,Iterable) else p.denominator if type(p)==frac else 1
 
-bell=lambda n: smp(lambda k: subset(n,k),range(n+1))
-touchard=lambda n: polynomial(tap(lambda k: subset(n,k),range(n+1)))
+#bell=lambda n: smp(lambda k: subset(n,k),range(n+1))
+bell=cache(lambda n: int(not n) or smp(lambda k: comb(n-1,k)*bell(k),range(n)))
+#touchard=lambda n: polynomial(tap(lambda k: subset(n,k),range(n+1)))
+#touchard=cache(lambda n: polynomial(not n) or x*smp(lambda k: comb(n-1,k-1)*touchard(k-1),range(1,n+1)))
+#touchard=cache(lambda n: polynomial(not n) or x*((c:=1)+sum((c:=c*(n-k)//k)*touchard(k) for k in range(1,n))))
 #touchard=lambda n: polynomial(Y(lambda f: lambda k,p,o: o if k>n else f(k+1,(md:=moddiv(p,x-k))[1],o+(md[0][0],)))(2,polynomial((1,)*(n-1)),(0,1))) #very slow and bad
-touchard=lambda n: polynomial(Y(lambda f: lambda k,p,o: o if k>n else f(k+1,(md:=Y(lambda f: lambda p,d: (p[0],d) if len(p)==1 else f((p[1]+k*p[0],)+p[2:],d+(p[0],)))(p,()))[1],o+(md[0],)))(1,(1,)+(0,)*(n-1),(0,))) #beats out other one for n>(about 512); from https://scholars.iwu.edu/ws/portalfiles/portal/39727279/fulltext.pdf
+#touchard=lambda n: polynomial(Y(lambda f: lambda k,p,o: o if k>n else f(k+1,(md:=Y(lambda f: lambda p,d: (p[0],d) if len(p)==1 else f((p[1]+k*p[0],)+p[2:],d+(p[0],)))(p,()))[1],o+(md[0],)))(1,(1,)+(0,)*(n-1),(0,))) #beats out the one that computes all the subset numbers separately for n>(about 512); from https://scholars.iwu.edu/ws/portalfiles/portal/39727279/fulltext.pdf
+touchard=lambda n: rtouchard(n)
+
+def rtouchard(n,r=0,inp=None): #as submitted in https://github.com/sympy/sympy/pull/30372
+    '''actually slightly more powerful than its name suggests
+    n is the degree of the input polynomial
+    r makes it generate r-subset numbers
+    inp lets it turn arbitrary polynomials into polychooses
+    '''
+    if n<r: return [0]*(n+1)
+    # initially, tree[k] = x-k; at each height, tree[boundary(j)-1] is the product of the x-k's for k in [boundary(j-1)..boundary(j))
+    n-=r-1
+    L = n.bit_length()
+
+    tree = [(-r-k,1) for k in range(n)]
+
+    mul=lambda a,b: [sum(a[j]*b[i-j] for j in range(max(i+1-len(b),0),min(i+1,len(a)))) for i in range(len(a)+len(b)-1)]
+    for d in range(L - 1, 0, -1):
+        for j in range(1,1<<d):
+            if (j-1)*n>>d < (m:=(2*j-1)*n>>d+1) < (b:=j*n>>d): tree[b-1] = mul(tree[b-1],tree[m-1])
+
+    # root occupies tree[0]
+    tree[-1]=[0]*(n-1)+[1] if inp==None else list(inp)
+
+    def divmod(p,q):
+        _divmod=lambda r,p: (r,p) if len(p)<len(q) else _divmod([p[-1]]+r,p[:-len(q)]+[a-p[-1]*b for a,b in zip(p[-len(q):-1],q[:-1])])
+        return _divmod([],p)
+    # split forwards through each branch
+    for d in range(L):
+        for j in range(1<<d,0,-1):
+            if (j-1)*n>>d < (m:=(2*j-1)*n>>d+1) < (b:=j*n>>d): tree[b-1],tree[m-1] = divmod(tree[b-1],tree[m-1])
+
+    return polynomial([0]*r+[tree[k][0] for k in range(n)]) #going to have to add support for polynomials with negative valx to properly manifest this prog
+
 subbell=lambda n: smp(lambda k: choose(~k,~n)*bell(k),range(n+1))
 #Bell polynomials; copying SymPy for now
 bellY=lambda n,k,x: sum(starmap(lambda m,c: x[m]*c*bellY(n+~m,k-1,x[:n-k-m+1]),enumerate(redumulate(lambda c,m: c*(n+~m)/(m+1),range(n-k),frac(1))))) if n and k else not (n or k) #mth value of c is choose(n-1,m) #à la Mathematica's name; conventionally the 'partial/incomplete Bell polynomials'
@@ -52,7 +88,7 @@ Nørlund ("generalised Bernoulli") numbers
 '''
 #norlund=lambda n,r: smp(lambda k: (-1)**k*subset(n,k)*smp(lambda l: choose(r,l)*smp(lambda m: choose(~m,~l)*frac(cycle(k+m,m),choose(k+m,m)),range(l+1)),range(k+1)),range(n+1)) #this is that paper's theorem 9 (very suspicious)
 norlund=lambda n,r: smp(lambda k: (-1)**k*subset(n,k)*frac(cycle(k+r,r),choose(k+r,r)),range(n+1)) #known prior to Kruchinin in sequences like A191577
-norlund=lambda n,r: smp(lambda k: (-1)**k*multichoose(r,k)*frac(subset2(n+k,k),choose(n+k,k)),range(n+1)) #theorem 8
+norlund=lambda n,r: smp(lambda k: (-1)**k*rising(r,k)*frac(subset2(n+k,k),falling(n+k,k)),range(n+1)) #theorem 8
 #norlund=lambda n,r: smp(lambda k: (-1)**k*frac(rising(r,k),rising(n+1,k))*subsetWard(n,k),range(n+1)) #another way of writing theorem 8
 norlundPoly=lambda n,r: smp(lambda i: choose(n,i)*norlund(n-i,r)*x**i,range(n+1)) #B_n^{(r)}(x) = [t^n/n!](t/(e^t-1))^r*e^{x*t}
 def norlundPolys(r,deg): #tuple of Nørlund polynomials (B_0^{(r)}(x),...,B_{deg-1}^{(r)}(x))
@@ -130,8 +166,10 @@ en=lambda n: smp(lambda k: x**k/fact(k),range(n+1))*x/x #=exp(x)*Gamma(n+1,x)/n!
 class polychoose:
     def __init__(p,*l):
         p.internal=(tuple(polychoose(polynomial(l[0]))) if type(l[0])=='polyprod' else
-                    polychoose(matmul((l[0],),tuple(redumulate(lambda r,i: tap(int.__mul__,(1+x)*r,range(i+1))+(0,)*(len(l[0])+~i),range(1,len(l[0])),(1,)+(0,)*deg(l[0]))))[0]) if type(l[0])==polynomial else #matrix is inverse(tap(lambda r: tuple(r)+(0,)*(len(p)-len(r)),redumulate(lambda r,i: r*(x-i)/(i+1),range(deg(p)),x/x)))
-                    l[0].internal if type(l[0])==polychoose else (lambda t: t[:len(t)-next(filter(t[::-1].__getitem__,range(len(t))))] if any(t) else (0,))(tuple(l[0]) if len(l)==1 and isinstance(l[0],Iterable) else tuple(l))) #do not add  (too many problems)
+                    tap(__mul__,rtouchard(d:=deg(l[0]),inp=l[0]),scan(__mul__,range(1,d+1),1)) if type(l[0])==polynomial else  polychoose(matmul((l[0],),tuple(redumulate(lambda r,i: tap(int.__mul__,(1+x)*r,range(i+1))+(0,)*(len(l[0])+~i),range(1,len(l[0])),(1,)+(0,)*deg(l[0]))))[0])
+                    #formerly:
+                    #matmul((l[0],),tuple(redumulate(lambda r,i: tap(int.__mul__,(1+x)*r,range(i+1))+(0,)*(d-i),range(1,(d:=deg(l[0]))+1),(1,)+(0,)*d)))[0] if type(l[0])==polynomial else #matrix is inverse(tap(lambda r: tuple(r)+(0,)*(len(p)-len(r)),redumulate(lambda r,i: r*(x-i)/(i+1),range(deg(p)),x/x)))
+                    l[0].internal if type(l[0])==polychoose else (lambda t: t[:len(t)-next(filter(t[::-1].__getitem__,range(len(t))))] if any(t) else (0,))(tuple(l[0]) if len(l)==1 and isinstance(l[0],Iterable) else tuple(l)))
     __iter__=lambda p: iter(p.internal)
     __call__=lambda p,x: sum(starmap(lambda i,c: c*choose(x,i),enumerate(p)))
     __repr__=lambda p,sups=True,x='x',frac=True: (lambda de,t: '('*(t!=1!=de)+(''.join(starmap(lambda i,c: (lambda n,d: bool(n)*(('-' if sgn(n)==-1 else '+'*any(p[:i]))+str(abs(n))*(abs(n)!=1)+'*'*(abs(n)!=1)+'c('+x+','+str(i)+')'+(d!=1)*('/'+str(d))))(*((int(de*c),1) if frac else (c.numerator,c.denominator) if type(c)==frac else (c,1))),enumerate(p))) if t else '0')+(')'*(t!=1)+'/'*(1+(0 and not gcd(p)%1))+str(de))*(1!=de))(denom(p) if frac else 1,smp(bool,p))

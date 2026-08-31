@@ -13,7 +13,7 @@ def algL_iterate(seq): #thank you Narayana followed by Knuth followed by https:/
   k_val=seq[k]
   for i in revange(len(seq)):
     if k_val<seq[i]: break
-  (seq[k],seq[i])=(seq[i],seq[k])
+  seq[k],seq[i]=seq[i],seq[k]
   seq[k+1:]=seq[-1:k:-1]
   return seq
 
@@ -60,7 +60,7 @@ def perm(f,n=None): #O(n*log(n) :-)
   tree=fenwick(n)
   p=len(f)*[0]+list(range(len(f),n))
   for i in range(n-len(f),n):
-    p[~i]=tree.index(j:=n-i+~f.pop())
+    p[~i]=tree.index(n-i+~f.pop())
     tree[p[~i]]=0
   return p
 def unperm(p): #O(n*log(n) :-)
@@ -199,7 +199,7 @@ def A000793(n,o=True): #highest lcm of integers summing to n
 #A003418=(lambda n: reduce(lcm,range(1,n+1),1))
 A003418=(lambda n: prod(map(lambda p: p**ilog(n,p),primerange(n+1)))) #lcm of all length-n permutations' orders
 
-permute=lambda p,t: (lambda o: o+t[len(p):] if len(t)>len(p) else o)(tap(t.__getitem__,p)) #could also be done by the other convention, tap(t.index,p), by inverting them, but this is the faster convention when __getitem__ is O(1)
+permute=lambda p,t: (lambda o: o+t[len(p):] if len(t)>len(p) else o)(lap(t.__getitem__,p)) #could also be done by the other convention, tap(t.index,p), by inverting them, but this is the faster convention when __getitem__ is O(1)
 class permutation:
   __call__=lambda p,l: permute(p.internal,l)
   __repr__=lambda p: 'permutation('+(','*(len(p)>9)).join(map(str,p.internal))+')'
@@ -235,8 +235,11 @@ class permutation:
       while f: p.internal.append[l.pop(f.pop())]
       return p.internal'''
     #p.internal=reduce(lambda t,i: ((len(s)+~t[1].pop(i),)+t[0],t[1]),s:=shortduce(lambda t: (lambda m,d: (((m,)+t[0],d,t[2]+1),d))(*moddiv(t[1],t[2])),i=((),t,1))[0],((),list(range(len(s)))))[0] if type(t)==int else tuple(fromCycles(t) if t and isinstance(t[0],Iterable) else t)
-    p.internal=(nicerm if nice else perm)(factoradic(t)) if type(t)==int else tuple(fromCycles(t) if t and isinstance(t[0],Iterable) else t)
-    if n!=None: p.internal.extend(range(len(p.internal),n))
+    p.internal=(nicerm if nice else perm)(factoradic(t)) if type(t)==int else list(fromCycles(t) if t and isinstance(t[0],Iterable) else t)
+    if n!=None:
+      if n: p.internal.extend(range(len(p.internal),n))
+      else:
+        p.internal=[]
   #various other things
   '''
     __int__=(lambda p: sum(starmap(int.__mul__,enumerate(reversed(tuple(starmap(lambda i,t: t-smp(t.__gt__,p[:i]),enumerate(p)))),start=1))))

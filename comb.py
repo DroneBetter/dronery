@@ -1,25 +1,6 @@
 from dronery.common import*
 
-def accel_asc(n): #(thank you https://jeromekelleher.net/generating-integer-partitions.html ;-)
-    if n:
-        a=lap(lambda _: 0,range(n+1))
-        k=1
-        y=n-1
-        while k:
-            k-=1
-            x=a[k]+1
-            while x<=y>>1:
-                a[k]=x
-                y-=x
-                k+=1
-            while x<=y:
-                a[k],a[k+1]=x,y
-                yield a[:k+2]
-                x+=1;y-=1
-            y+=x-1
-            a[k]=y+1
-            yield a[:k+1]
-    else: yield [] #returning ([],) rather than ([0],) makes many identities nicer; with it, comb(n-1,k-1)=smp(lambda p: len(p)==k and comb(len(p),*map(rgetitem(1),rle(p))),accel_asc(n)) works for comb(-1,-1)=1
+
 intPart=integerPartitions=accel_asc #for ordered, see diffcomb
 
 ncontains=lambda l: lambda i: i not in l
@@ -49,7 +30,7 @@ class combsys: #combinatorial number systems (and adjacent conventions)
         s.current=(0,)*k if curr==None else curr
     __len__=lambda s: None if s.n==None else s.len
     getter=lambda s,i: Y(lambda f: lambda r,d,i: f(r+(s.n+~(n:=invchoose(d+1,i)-d),),d-1,i-multichoose(n,d+1)) if d else r+(s.n+~i,))((),s.k-1,s.len+~i) if s.rev else Y(lambda f: lambda r,d,i: f((n:=invchoose(d+1,i)-d,)+r,d-1,i-multichoose(n,d+1)) if d else (i,)+r)((),s.k-1,i)
-    __getitem__=lambda s,i: expumulate(s.succ,(i.stop if s.n==None else len(s) if i.stop==None else min(i.stop,len(s)))+~(i.start or 0))(s.getter(i.start or 0)) if type(i)==slice else s.getter(i)
+    __getitem__=lambda s,i: (expumulate(s.succ,(i.stop if s.n==None else len(s) if i.stop==None else min(i.stop,len(s)))+~(i.start or 0))(s.getter(i.start or 0)) if i.stop>(i.start or 0) else ()) if type(i)==slice else s.getter(i)
     index=lambda s,o: (lambda i: s.len+~i if s.rev else i)(srmp(lambda d,i: multichoose(s.n+~i if s.rev else i,s.k-d if s.rev else d+1),enumerate(o)))
     succ=lambda s,o: Y(lambda f: lambda d:
      (f(d-1) if d>0 and o[d]==s.n-1 else o[:d]+(o[d]+1,)*(len(o)-d))
@@ -114,4 +95,6 @@ class diffcomb: #forward differences of combsys
 orderedIntPart=diffcomb #for unordered, see normal intPart
 
 #def combinatind(sub,set): prev=-1;return sum(smp(lambda j: comb(len(set)+~j,len(sub)+~i),range(prev+1,prev:=set.index(c))) for i,c in enumerate(sub)) #index within output of itertools.combinations
-#sortduct=lambda n,repeat: map(taph(n.__getitem__),redumulate(lambda k,_: shortduce(lambda k,i: ((k[i]+1,)*(i+1)+k[i+1:],k[i]==len(n)-1),range(len(n)),k),range(comb(len(n)+repeat-1,len(n))-1),(0,)*repeat)) #my feeling when it already existed
+#sortduct=lambda n,repeat: map(taph(n.__getitem__),scan(lambda k,_: shortduce(lambda k,i: ((k[i]+1,)*(i+1)+k[i+1:],k[i]==len(n)-1),range(len(n)),k),range(comb(len(n)+repeat-1,len(n))-1),(0,)*repeat)) #my feeling when it already existed
+sortduct=lambda n,repeat:  map(taph(n.__getitem__),scan(lambda k,_: shortduce(lambda k,i: ((k[i]+1,)*(i+1)+k[i+1:],k[i]==len(n)-1),range(len(n)),k),range(comb(len(n)+repeat-1,len(n))-1),(0,)*repeat)) #my feeling when it already existed
+sortduct=lambda n,repeat: chain((k:=(0,)*repeat,),(k:=shortduce(lambda k,i: ((k[i]+1,)*(i+1)+k[i+1:],k[i]==len(n)-1),range(len(n)),k) for _ in range(comb(len(n)+repeat-1,len(n))-1)))
