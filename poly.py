@@ -6,21 +6,21 @@ from operator import __add__,__neg__,__sub__,__mul__,__floordiv__,__truediv__,__
 from collections.abc import Callable
 
 def shed(f,l,i): #like a snake, not a garden building
-    if type(l)==list:
-        while l:
-            (y,i)=f(i,l.pop(0))
-            yield(y)
-    else:
-        for j in l:
-            (y,i)=f(i,j)
-            yield(y)
+  if type(l)==list:
+    while l:
+      (y,i)=f(i,l.pop(0))
+      yield(y)
+  else:
+    for j in l:
+      (y,i)=f(i,j)
+      yield(y)
 antidiagonal=lambda x,y,d,valx=0,valy=0: (max(d+1-y,0),min(d+1-0,x))#(max(d+1-y,valx),min(d+1-valy,x)) #d being index
 
 def trim(*a): #a little bit off the top (only the leading zeros)
-    for i in range(min(map(lambda p: 1 if type(p)==int else len(p),a))):
-        if any(map(lambda a: a if type(a)==int else a[i],a)): break
-    else: raise(ValueError(a,'what the heck'))
-    return(tap(lambda a: (a,) if type(a)==int else a[i:],a))
+  for i in range(min(map(lambda p: 1 if type(p)==int else len(p),a))):
+    if any(map(lambda a: a if type(a)==int else a[i],a)): break
+  else: raise(ValueError(a,'what the heck'))
+  return(tap(lambda a: (a,) if type(a)==int else a[i:],a))
 deg=lambda p: len(p)-1 #for convenience
 sups='⁰¹²³⁴⁵⁶⁷⁸⁹'
 sup=lambda i,supss=True: ''.join(map(lambda n: sups[int(n)],str(i))) if supss else '**'+str(i)
@@ -34,38 +34,39 @@ bell=cache(lambda n: int(not n) or smp(lambda k: comb(n-1,k)*bell(k),range(n)))
 #touchard=cache(lambda n: polynomial(not n) or x*((c:=1)+sum((c:=c*(n-k)//k)*touchard(k) for k in range(1,n))))
 #touchard=lambda n: polynomial(Y(lambda f: lambda k,p,o: o if k>n else f(k+1,(md:=moddiv(p,x-k))[1],o+(md[0][0],)))(2,polynomial((1,)*(n-1)),(0,1))) #very slow and bad
 #touchard=lambda n: polynomial(Y(lambda f: lambda k,p,o: o if k>n else f(k+1,(md:=Y(lambda f: lambda p,d: (p[0],d) if len(p)==1 else f((p[1]+k*p[0],)+p[2:],d+(p[0],)))(p,()))[1],o+(md[0],)))(1,(1,)+(0,)*(n-1),(0,))) #beats out the one that computes all the subset numbers separately for n>(about 512); from https://scholars.iwu.edu/ws/portalfiles/portal/39727279/fulltext.pdf
-touchard=lambda n: rtouchard(n)
+touchard=lambda n: polynomial(rtouchard(n))
+
 
 def rtouchard(n,r=0,inp=None): #as submitted in https://github.com/sympy/sympy/pull/30372
-    '''actually slightly more powerful than its name suggests
-    n is the degree of the input polynomial
-    r makes it generate r-subset numbers
-    inp lets it turn arbitrary polynomials into polychooses
-    '''
-    if n<r: return [0]*(n+1)
-    # initially, tree[k] = x-k; at each height, tree[boundary(j)-1] is the product of the x-k's for k in [boundary(j-1)..boundary(j))
-    n-=r-1
-    L = n.bit_length()
+  '''actually slightly more powerful than its name suggests
+  n is the degree of the input polynomial
+  r makes it generate r-subset numbers
+  inp lets it change-of-basis arbitrary polynomials into polychooses
+  '''
+  if n<r: return [0]*(n+1)
+  # initially, tree[k] = x-k; at each height, tree[boundary(j)-1] is the product of the x-k's for k in [boundary(j-1)..boundary(j))
+  n-=r-1
+  L=n.bit_length()
 
-    tree = [(-r-k,1) for k in range(n)]
+  tree=[(-r-k,1) for k in range(n)]
 
-    mul=lambda a,b: [sum(a[j]*b[i-j] for j in range(max(i+1-len(b),0),min(i+1,len(a)))) for i in range(len(a)+len(b)-1)]
-    for d in range(L - 1, 0, -1):
-        for j in range(1,1<<d):
-            if (j-1)*n>>d < (m:=(2*j-1)*n>>d+1) < (b:=j*n>>d): tree[b-1] = mul(tree[b-1],tree[m-1])
+  mul=lambda a,b: [sum(a[j]*b[i-j] for j in range(max(i+1-len(b),0),min(i+1,len(a)))) for i in range(len(a)+len(b)-1)]
+  for d in range(L - 1, 0, -1):
+    for j in range(1,1<<d):
+      if (j-1)*n>>d < (m:=(2*j-1)*n>>d+1) < (b:=j*n>>d): tree[b-1]=mul(tree[b-1],tree[m-1])
 
-    # root occupies tree[0]
-    tree[-1]=[0]*(n-1)+[1] if inp==None else list(inp)
+  # root occupies tree[0]
+  tree[-1]=[0]*(n-1)+[1] if inp==None else list(inp)
 
-    def divmod(p,q):
-        _divmod=lambda r,p: (r,p) if len(p)<len(q) else _divmod([p[-1]]+r,p[:-len(q)]+[a-p[-1]*b for a,b in zip(p[-len(q):-1],q[:-1])])
-        return _divmod([],p)
-    # split forwards through each branch
-    for d in range(L):
-        for j in range(1<<d,0,-1):
-            if (j-1)*n>>d < (m:=(2*j-1)*n>>d+1) < (b:=j*n>>d): tree[b-1],tree[m-1] = divmod(tree[b-1],tree[m-1])
+  def divmod(p,q):
+    _divmod=lambda r,p: (r,p) if len(p)<len(q) else _divmod([p[-1]]+r,p[:-len(q)]+[a-p[-1]*b for a,b in zip(p[-len(q):-1],q[:-1])])
+    return _divmod([],p)
+  # split forwards through each branch
+  for d in range(L):
+    for j in range(1<<d,0,-1):
+      if (j-1)*n>>d < (m:=(2*j-1)*n>>d+1) < (b:=j*n>>d): tree[b-1],tree[m-1] = divmod(tree[b-1],tree[m-1])
 
-    return polynomial([0]*r+[tree[k][0] for k in range(n)]) #going to have to add support for polynomials with negative valx to properly manifest this prog
+  return polynomial([0]*r+[tree[k][0] for k in range(n)]) #going to have to add support for polynomials with negative valx to properly manifest this prog for negative r
 
 subbell=lambda n: smp(lambda k: choose(~k,~n)*bell(k),range(n+1))
 #Bell polynomials; copying SymPy for now
@@ -92,8 +93,8 @@ norlund=lambda n,r: smp(lambda k: (-1)**k*rising(r,k)*frac(subset2(n+k,k),fallin
 #norlund=lambda n,r: smp(lambda k: (-1)**k*frac(rising(r,k),rising(n+1,k))*subsetWard(n,k),range(n+1)) #another way of writing theorem 8
 norlundPoly=lambda n,r: smp(lambda i: choose(n,i)*norlund(n-i,r)*x**i,range(n+1)) #B_n^{(r)}(x) = [t^n/n!](t/(e^t-1))^r*e^{x*t}
 def norlundPolys(r,deg): #tuple of Nørlund polynomials (B_0^{(r)}(x),...,B_{deg-1}^{(r)}(x))
-    Ar=((1-x**(2*deg-1))/tap(lambda k: frac(1,fact(k+1)),range(deg))).pow(r,x**(deg))
-    return tap(lambda m: polynomial(lap(lambda a: Ar[m-a]/fact(a),range(m+1)))*fact(m),range(deg))
+  Ar=((1-x**(2*deg-1))/tap(lambda k: frac(1,fact(k+1)),range(deg))).pow(r,x**(deg))
+  return tap(lambda m: polynomial(lap(lambda a: Ar[m-a]/fact(a),range(m+1)))*fact(m),range(deg))
 #allows for cool things like https://math.stackexchange.com/a/5108126;
 #>>> r=3;print(stratrix(tap(lambda m: tap(lambda n: stratrix((smp(lambda k: choose(n+r-1-k,r-1)*k**m,range(1,n+1)),frac(fact(m),fact(m+r))*norlundPoly(m+r,r)(n+r)-smp(lambda i: (-1)**(m+r-i)*multichoose(n,i)*frac(fact(m),fact(m+r-i))*norlund(m+r-i,r-i),range(r)))),range(8)),range(8)),dims=2))
 norlundB=lambda n,r,x=None: norlund(n,r) if x==None else norlundPoly(n,r)(x) #equivalent to Mathematica's NorlundB
@@ -164,47 +165,47 @@ nicergeometric=lambda p,q: sum(redumulate(lambda r,i: r*x*prod(map(add2(i),p))/p
 en=lambda n: smp(lambda k: x**k/fact(k),range(n+1))*x/x #=exp(x)*Gamma(n+1,x)/n! #https://mathworld.wolfram.com/ExponentialSumFunction.html
 
 class polychoose:
-    def __init__(p,*l):
-        p.internal=(tuple(polychoose(polynomial(l[0]))) if type(l[0])=='polyprod' else
-                    tap(__mul__,rtouchard(d:=deg(l[0]),inp=l[0]),scan(__mul__,range(1,d+1),1)) if type(l[0])==polynomial else  polychoose(matmul((l[0],),tuple(redumulate(lambda r,i: tap(int.__mul__,(1+x)*r,range(i+1))+(0,)*(len(l[0])+~i),range(1,len(l[0])),(1,)+(0,)*deg(l[0]))))[0])
-                    #formerly:
-                    #matmul((l[0],),tuple(redumulate(lambda r,i: tap(int.__mul__,(1+x)*r,range(i+1))+(0,)*(d-i),range(1,(d:=deg(l[0]))+1),(1,)+(0,)*d)))[0] if type(l[0])==polynomial else #matrix is inverse(tap(lambda r: tuple(r)+(0,)*(len(p)-len(r)),redumulate(lambda r,i: r*(x-i)/(i+1),range(deg(p)),x/x)))
-                    l[0].internal if type(l[0])==polychoose else (lambda t: t[:len(t)-next(filter(t[::-1].__getitem__,range(len(t))))] if any(t) else (0,))(tuple(l[0]) if len(l)==1 and isinstance(l[0],Iterable) else tuple(l)))
-    __iter__=lambda p: iter(p.internal)
-    __call__=lambda p,x: sum(starmap(lambda i,c: c*choose(x,i),enumerate(p)))
-    __repr__=lambda p,sups=True,x='x',frac=True: (lambda de,t: '('*(t!=1!=de)+(''.join(starmap(lambda i,c: (lambda n,d: bool(n)*(('-' if sgn(n)==-1 else '+'*any(p[:i]))+str(abs(n))*(abs(n)!=1)+'*'*(abs(n)!=1)+'c('+x+','+str(i)+')'+(d!=1)*('/'+str(d))))(*((int(de*c),1) if frac else (c.numerator,c.denominator) if type(c)==frac else (c,1))),enumerate(p))) if t else '0')+(')'*(t!=1)+'/'*(1+(0 and not gcd(p)%1))+str(de))*(1!=de))(denom(p) if frac else 1,smp(bool,p))
-    __bool__=lambda p: p!=0
-    __len__=lambda p: len(p.internal)
-    __getitem__=lambda p,i: polychoose(p.internal[i]) if type(i)==slice else int(0<=i<len(p)) and p.internal[i]
-    pop=lambda p,i=-1: p.internal.pop(i)
-    __add__=lambda a,b: a+polychoose(b) if isinstance(b,Number) else polychoose(starmap(__add__,zip_longest(a,polychoose(b),fillvalue=0)))
-    __neg__=lambda p: polychoose(-p if isinstance(p,Number) else map(__neg__,p))
-    __sub__=lambda a,b: a+polychoose.__neg__(b)
-    __rsub__=lambda a,b: -a+b
-    __mul__=lambda a,b: polychoose(polynomial(a)*polynomial(b)) #lambda a,b: sum(starmap(lambda i,j: chooseprod(i,j)*a[i]*b[j],product(range(len(a)),range(len(b)))))
-    __radd__=__add__
-    __rmul__=__mul__
-    __pow__=lambda a,n: squow(a,n,__mul__,polychoose(1))#funcxp(a.__mul__,n)(polynomial(1))
-    __rtruediv__=lambda a,b: polychoose.__truediv__(b,a)
-    __truediv__=lambda a,b,frac=True: a*Fraction(1,b) if isinstance(b,Number) else polychoose(polynomial.__truediv__(polynomial(a),polynomial(b),frac))
-    __eq__=lambda a,b: len(a)==1 and a[0]==b if type(b)==int else a.internal==(b.internal if type(b)==polynomial else b)
-    __lshift__=lambda p,n: polychoose((0,)*n+p.internal)
-    __rshift__=lambda p,n: polychoose(p.internal[n:])
-    abs=lambda p: next(map(sgn,filter(id,p.internal)))*p
+  def __init__(p,*l):
+    p.internal=(tuple(polychoose(polynomial(l[0]))) if type(l[0])=='polyprod' else
+                tap(__mul__,rtouchard(d:=deg(l[0]),inp=l[0]),scan(__mul__,range(1,d+1),1)) if type(l[0])==polynomial else
+                #formerly:
+                #matmul((l[0],),tuple(redumulate(lambda r,i: tap(int.__mul__,(1+x)*r,range(i+1))+(0,)*(d-i),range(1,(d:=deg(l[0]))+1),(1,)+(0,)*d)))[0] if type(l[0])==polynomial else #matrix is inverse(tap(lambda r: tuple(r)+(0,)*(len(p)-len(r)),redumulate(lambda r,i: r*(x-i)/(i+1),range(deg(p)),x/x)))
+                l[0].internal if type(l[0])==polychoose else (lambda t: t[:len(t)-next(filter(t[::-1].__getitem__,range(len(t))))] if any(t) else (0,))(tuple(l[0]) if len(l)==1 and isinstance(l[0],Iterable) else tuple(l)))
+  __iter__=lambda p: iter(p.internal)
+  __call__=lambda p,x: sum(starmap(lambda i,c: c*choose(x,i),enumerate(p)))
+  __repr__=lambda p,sups=True,x='x',frac=True: (lambda de,t: '('*(t!=1!=de)+(''.join(starmap(lambda i,c: (lambda n,d: bool(n)*(('-' if sgn(n)==-1 else '+'*any(p[:i]))+str(abs(n))*(abs(n)!=1)+'*'*(abs(n)!=1)+'c('+x+','+str(i)+')'+(d!=1)*('/'+str(d))))(*((int(de*c),1) if frac else (c.numerator,c.denominator) if type(c)==frac else (c,1))),enumerate(p))) if t else '0')+(')'*(t!=1)+'/'*(1+(0 and not gcd(p)%1))+str(de))*(1!=de))(denom(p) if frac else 1,smp(bool,p))
+  __bool__=lambda p: p!=0
+  __len__=lambda p: len(p.internal)
+  __getitem__=lambda p,i: polychoose(p.internal[i]) if type(i)==slice else int(0<=i<len(p)) and p.internal[i]
+  pop=lambda p,i=-1: p.internal.pop(i)
+  __add__=lambda a,b: a+polychoose(b) if isinstance(b,Number) else polychoose(starmap(__add__,zip_longest(a,polychoose(b),fillvalue=0)))
+  __neg__=lambda p: polychoose(-p if isinstance(p,Number) else map(__neg__,p))
+  __sub__=lambda a,b: a+polychoose.__neg__(b)
+  __rsub__=lambda a,b: -a+b
+  __mul__=lambda a,b: polychoose(polynomial(a)*polynomial(b)) #lambda a,b: sum(starmap(lambda i,j: chooseprod(i,j)*a[i]*b[j],product(range(len(a)),range(len(b)))))
+  __radd__=__add__
+  __rmul__=__mul__
+  __pow__=lambda a,n: squow(a,n,__mul__,polychoose(1))#funcxp(a.__mul__,n)(polynomial(1))
+  __rtruediv__=lambda a,b: polychoose.__truediv__(b,a)
+  __truediv__=lambda a,b,frac=True: a*Fraction(1,b) if isinstance(b,Number) else polychoose(polynomial.__truediv__(polynomial(a),polynomial(b),frac))
+  __eq__=lambda a,b: len(a)==1 and a[0]==b if type(b)==int else a.internal==(b.internal if type(b)==polynomial else b)
+  __lshift__=lambda p,n: polychoose((0,)*n+p.internal)
+  __rshift__=lambda p,n: polychoose(p.internal[n:])
+  abs=lambda p: next(map(sgn,filter(id,p.internal)))*p
 
-    diff=lambda p: polychoose(matmul((p,),tuple(redumulate(lambda r,i: (frac((-1)**i,i+1),)+r[:-1],range(len(p)),(0,)*len(p))))[0]) #polychoose(polynomial(p).diff())
-    inte=lambda p: polychoose(matmul((p,),tuple(redumulate(lambda r,i: (0,gregory(i+1))+r[1:-1],range(len(p)),(0,)+(1,)+(0,)*deg(p))))[0]) #polychoose(polynomial(p).inte())
-    differences=lambda p: p>>1
-    partialSums=lambda p: p<<1
+  diff=lambda p: polychoose(matmul((p,),tuple(redumulate(lambda r,i: (frac((-1)**i,i+1),)+r[:-1],range(len(p)),(0,)*len(p))))[0]) #polychoose(polynomial(p).diff())
+  inte=lambda p: polychoose(matmul((p,),tuple(redumulate(lambda r,i: (0,gregory(i+1))+r[1:-1],range(len(p)),(0,)+(1,)+(0,)*deg(p))))[0]) #polychoose(polynomial(p).inte())
+  differences=lambda p: p>>1
+  partialSums=lambda p: p<<1
 
 x=polynomial(0,1);c=polychoose(0,1) #for convenience
 
 #fit=lambda *t: polynomial(tap(rgetitem(0),matmul(inverse(tap(lambda n: tap(lambda k: n[0]**k,range(len(t))),t)),tap(lambda n: (n[1],),t)) if type(t[0])==tuple else matmul(inverse(tap(lambda n: tap(lambda k: n**k,range(len(t))),range(len(t)))),tap(lambda n: (n,),t)))) #O(n**3)
 fit=lambda *t: (lambda t: smp(lambda n: polynomial(prod(map(lambda k: (k[0]-x)/(k[0]-t[n][0]),t[:n]+t[n+1:])))*t[n][1],range(len(t))))(t if type(t[0])==tuple else tuple(enumerate(t))) #O(n**2) (thank you Lagrange)
 def fit(*t):
-    if type(t[0])!=tuple: t=tuple(enumerate(t))
-    p=polynomial(prod(map(lambda k: k[0]-x,t)))
-    return smp(lambda n: (pp:=p/(t[n][0]-x))/pp(t[n][0])*t[n][1],range(len(t))) #O(n**2) (thank you Lagrange)
+  if type(t[0])!=tuple: t=tuple(enumerate(t))
+  p=polynomial(prod(map(lambda k: k[0]-x,t)))
+  return smp(lambda n: (pp:=p/(t[n][0]-x))/pp(t[n][0])*t[n][1],range(len(t))) #O(n**2) (thank you Lagrange)
 ϑp=8 #precision for theta functions
 f=lambda a,b=None: f(a,-a**2) if b==None else smp(lambda n: a**choose(n+1,2)*b**choose(n,2),range(1-ϑp,ϑp))
 g=lambda a,b=None,c=0: f(a,-a**2) if b==None else smp(lambda n: (d:=c+a*choose(n+1,2)+b*choose(n,2))>=0 and x**d,range(1-ϑp,ϑp))
@@ -219,6 +220,128 @@ multichooseby=lambda k: reduce(lambda r,i: r*(x+i),range(k),x/x)/fact(k) #polyno
 #chooseby=lambda k: prod(map(lambda i: i*(k-1-i)+x*(x+1-k),range(k>>1)),x/x)/fact(k)*(x-(k>>1))**(k&1)
 chooseprod=lambda n,m: polychoose((0,)*max(n,m)+tap(lambda i: choose(n,i-m)*choose(i,n),range(max(n,m),n+m+1))) #polychoose expansion of choose(x,n)*choose(x,m) (${x\choose n}\cdot{x\choose m}=\sum_{i=m}^{n+m}({n\choose i}\cdot{m+i\choose n}\cdot{x\choose i})$)
 #chooseprod=lambda n,m: polychoose((0,)*max(n,m)+tap(lambda i: choose(max(n,m),i-min(n,m))*choose(i,max(n,m)),range(max(n,m),n+m+1))) #more symmetrical
+
+#egfexp=lambda f: lambda n: fact(n)*smp(lambda p: frac(comb(len(p),*map(rgetitem(1),rle(p)))*prod(map(lambda k: frac(f(k),fact(k)),p)),fact(len(p))),accel_asc(n)) #you should never use this btw
+def egfexp(f):
+  ff=f.__getitem__ if isinstance(f,Iterable) else f.__call__
+  l=[1]
+  yield 1
+  n=1
+  while True:
+    try: l.append(i:=(c:=1)*ff(n)+sum((c:=c*(n-k)//k)*ff(n-k)*l[k] for k in range(1,n))) #f[n] + sum(comb(n-1,k)*f[n-k]*l[k] for k in range(1,n))
+    except: return
+    yield i
+    n+=1
+#faa=lambda f,g,egf=False: lambda n: smp(lambda p: frac(f(len(p)),fact(len(p)) if egf else 1)*prod(map(g,p))*(comb(n,*p) if egf else 1)*comb(len(p),*map(rgetitem(1),rle(p))),accel_asc(n)) #Faà di Bruno is so cool
+'''class faa: #original (simpler but less lazy) version
+  def __init__(s,*f,egf=None):
+    if egf==None and type(f[-1]) in {int,bool}:
+      egf=f[-1]
+      f=f[:-1]
+    s.egf=egf
+    if len(f)==2: (f,g)=f
+    else: f,g=f[0],faa(*f[1:],egf=egf) #
+    s.ff=f.__getitem__ if isinstance(f,Iterable) else f.__call__
+    s.gg=g.__getitem__ if isinstance(g,Iterable) else g.__call__
+    s.fVal=0 #will become f's valuation (first nonzero coeff index)
+    s.fff=[]
+    s.l=[]
+    s.out=[]
+  def grow(s,n):
+    s.fff.append(c:=s.ff(n))
+    if c and not s.fVal: s.fVal=n
+    s.l.append(i:=(c:=1)*s.gg(n)+x*sum((c:=c*(n-k)//k)*s.gg(n-k)*s.l[k] for k in range(1,n))
+      if s.egf else
+      (s.fVal<=1 and s.gg(n))+x*sum(s.gg(n-k)*s.l[k] for k in range(1,n)))
+    s.out.append(o:=dot(s.fff[1:],i) if n else s.fff[0])
+    return o
+  def __getitem__(s,n):
+    for k in range(len(s.out),n+1): s.grow(k)
+    return s.out[n]
+  __call__=__getitem__
+  def __iter__(s):
+    n=0
+    while True:
+      try: yield s[n]
+      except: return
+      n+=1'''
+
+
+class faa:
+  class _faa_row:
+    def __init__(s,f,n):
+      s.f,s.n,s.cache=f,n,{}
+
+    __getitem__=lambda s,j: s.f._lcoef(s.n,j)
+
+    __len__=lambda s: max(1,s.n)
+
+    def __iter__(s):
+      for j in range(len(s)): yield s[j]
+
+  def __init__(s,*f,egf=None):
+    if egf is None and type(f[-1]) in {int,bool}:
+      egf=f[-1]
+      f=f[:-1]
+    s.egf=egf
+    if len(f)==2: f,g=f
+    else: f,g=f[0],faa(*f[1:],egf=egf)
+    s.ff=f.__getitem__ if isinstance(f,Iterable) else f.__call__
+    s.gg=g.__getitem__ if isinstance(g,Iterable) else g.__call__
+    s.fVal=0
+    s.gVal=None
+    s.fff=[]
+    s.ggg=[]
+    s.l=[]
+    s.out=[]
+
+  def _gcoef(s,n):
+    while len(s.ggg) <= n:
+      k=len(s.ggg)
+      c=s.gg(k)
+      s.ggg.append(c)
+      if k and c and s.gVal is None: s.gVal=k
+    return s.ggg[n]
+
+  def _lcoef(s,n,j):
+    row=s.l[n].cache
+    if j in row: return row[j]
+
+    if j:
+      while s.gVal is None and len(s.ggg)<=n//(j+1): s._gcoef(len(s.ggg))
+    else: c=s._gcoef(n)
+      r=s.gVal
+      if r is None or n<(j+1)*r:
+        c=0
+      else:
+        lo,hi=j*r,n-r
+        c=(b:=comb(n-1,lo))*s._gcoef(n-lo)*s.l[lo][j-1]+sum((b:=b*(n-k)//k)*s._gcoef(n-k)*s.l[k][j-1] for k in range(lo+1,hi+1))\
+          if s.egf else sum(s._gcoef(n-k)*s.l[k][j-1] for k in range(lo,hi+1))
+
+    return row[j]:=c #updating row updates the cache
+
+  def grow(s,n):
+    s.fff.append(c:=s.ff(n))
+    if c and not s.fVal: s.fVal=n
+    s.l.append(_faa_row(s,n))
+    o=sum(s.fff[k]*s.l[n][k-1] for k in range(max(1,s.fVal),n+1) if s.fff[k]) if n else s.fff[0]
+    s.out.append(o)
+    return o
+
+  def __getitem__(s,n):
+    for k in range(len(s.out),n+1): s.grow(k)
+    return s.out[n]
+  __call__=__getitem__
+  def __iter__(s):
+    n=0
+    while True:
+      try: yield s[n]
+      except: return
+      n+=1
+
+fae=lambda *f: faa(*f,egf=True)
+#A048172=lambda n: egfexp(A058349)(n)-(n==0)-A058349(n)
+A000262=egfexp(lambda n: n and fact(n))
 
 from sympy import primerange,nextprime
 

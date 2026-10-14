@@ -234,13 +234,39 @@ superchoose=lambda n,k: superfact(n)//(superfact(k)*superfact(n-k))
 
 Delta=forwardDifferences=lambda f,n=1: lambda k: smp(lambda i: comb(~i,~n)*f(k+i),range(n+1)) #nth iterate
 
+def pthPowers(p,n): #yields the p-th powers of [2..n]; faster than map(lambda k: k**p,range(1,n+1)) when p is very large
+  if n>2:
+    spf=list(range(n+1))
+    for q in range(2,(s:=isqrt(n))+1):
+      if spf[q]==q:
+        for k in range(q*q,n+1,q):
+          if spf[k]==k: spf[k]=q
+    a=[0]*(n+2>>1)
+    a[1]=1
+    #yield 1,1
+    for k in range(2,n+1):
+      x=pow(k,p) if (q:=spf[k])==k else a[k//q]*a[q]
+      if k<=n>>1: a[k]=x
+      yield k,x
+  elif n==2: yield 2,2**p
+
 #Stirling numbers of the second kind
+def subsetrow(n,k): #equivalent to (subset(n,i) for i in range(k+1)) but you see it is more Fast for large n
+  a=[0]*(k+1)
+  yield 0
+  for i,x in chain(((1,1),),pthPowers(n,k)):
+    a[k-i]=x
+    for j in range(k-i+1,k+1):
+      a[j]-=a[j-1]
+      a[j]//=k-i-j
+    yield a[k]
 subset_int=lambda n,k: (__floordiv__ if type(n)==int else __truediv__)(forwardDifferences(lambda i: i**n,k)(0),fact(k))
 #subset_int=lambda n,k: smp(lambda i: comb(~i,~k)*i**n,range(k+1))//fact(k)
 #subset_int=lambda n,k: smp(lambda i: comb(-i,-k)*i**(n-1),range(1,k+1))//fact(k-1) #decrement choose by removing mutual factors for extremely marginal speedup
 #subset_int=lambda n,k: srmp(lambda i,c: c*i**n,enumerate(scan(lambda r,i: r*(i+~k)//i,range(1,k+1),(-1)**k)))//fact(k) #better way (using (-1)**(k-i)*comb(k,i)=comb(k,i-1)*(i+~k)//i (exceedingly fast))
 #subset_int=lambda n,k: srmp(lambda i,c: c*(i+1)**(n-1),enumerate(scan(lambda r,i: r*(i-k)//i,range(1,k),(-1)**(k-1))))//fact(k-1) #combining both optimisations
-subset_int=lambda n,k: ((r:=(-1)**(k-1))+sum((r:=r*(i-k)//i)*(i+1)**(n-1) for i in range(1,k)))//fact(k-1) #neater and better overheadwise
+#subset_int=lambda n,k: ((r:=(-1)**(k-1))+sum((r:=r*(i-k)//i)*(i+1)**(n-1) for i in range(1,k)))//fact(k-1) #neater and better overheadwise
+subset_int=lambda n,k: ((c:=(-1)**(k-1))+sum((c:=c*(i+~k)//(i-1))*p for i,p in pthPowers(n-1,k)))//fact(k-1) #pth powers
 #r-Stirling numbers (see https://doi.org/10.1016/0012-365X(84)90161-4)
 rsubset_int=lambda r,n,k: k>=r and smp(lambda i: comb(~i,r+~k)*frac(i+r)**(n-r),range(k-r+1))//fact(k-r) if type(r)==int and 0<=k and (0<=r or k<0 or n-r>=0) else sum(map(lambda i: comb(int(n-r),int(k+i-r))*subset(int(k+i-r),int(k-r))*r**(n-k-i),range(int(n-k)+1))) #supporting extension to negative n and positive k by default! #warning! if r is fractional, n and k must have the same fractional part
 #alternatively, smp(lambda i: comb(~i,~k)*frac(i)**(n-r)*falling(i,r),range(r,k+1))/fact(k) (equation 32)
@@ -251,6 +277,7 @@ rcycle_int=lambda r,n,k: smp(lambda i: comb(int(n-r),int(k-r)+i)*cycle(int(k-r)+
 cycle_int=lambda n,k: (r:=(-1)**(k+n)*choose(2*n-k,k,n-k)*k)*(n==k)//n+sum((r:=r*(n-k-i+1)//(k-n-i))//(i+n)*subset(i+n-k,i) for i in range(1,n-k+2))
 cycle_int=lambda n,k: ((r:=(-1)**(n-k)*choose(2*n-k,k,n-k)*k)*(n==k)//n if (o:=type(n)==type(k)==int) else (r:=(-1)**int(n-k)*frac(falling(2*n-k,2*int(n-k)),fact(int(n-k))**2)*k)*(n==k)/n)+sum(((r:=r*(n-k-i+1)//(k-n-i))//(i+n) if o else (r:=r*(n-k-i+1)/(k-n-i))/(i+n))*subset(i+int(n-k),i) for i in range(1,int(n-k)+1)) #due to https://oeis.org/wiki/User:Natalia_L._Skirrow/a_nicer_hypergeometric_formulation#an_umbral_hypergeometric_for_polynomial_interpolation; it also works when n and k have the same fractional part
 #for instance, A039821=lambda n: int(cycle_int(frac(1,2),frac(1,2)-n)*2**(4*n-1))
+
 subset=lambda n,k,above=False: int((cycle(-k,-n)) if n<0 else subset_int(n,k) if k>0 else n==0==k) if k<=n else int(k>=0>=n and above) and frac(forwardDifferences(lambda i: i and frac(1,i**-n),k)(0),fact(k))
 cycle=lambda n,k: int(k<=n and (subset(-k,-n) if n<0 else cycle_int(n,k) if k>0 else n==0==k))
 surjpow=surjectpow=lambda k,n,above=False: subset(n,k,above=above)*fact(k) #https://arxiv.org/abs/2501.08762
@@ -284,7 +311,8 @@ eulerian2=A008517=lambda n,k: smp(lambda i: (-1)**(k-i)*comb(2*n+1,k-i)*subset(n
 cycle2 =lambda n,k: forwardDifferences(lambda j: cycle(j,j-n+k),n)(0)
 A162973=lambda n: smp(lambda k: k*cycle2(n,k),range(n//2+1))
 #subset2=lambda n,k: forwardDifferences(lambda j: subset(j,j-n+k),n)(0)
-subset2=A008299=lambda n,k: sum(comb(n,i)*(-1)**(n-i)*subset(i,i-n+k) for i in range(n-k,n+1))
+subset2=A008299=lambda n,k: sum(comb(n,i)*(-1)**(n-i)*subset(i,i-n+k) for i in range(n-k,n+1)) #second-order (or associated) subset numbers
+subset_o=cache(lambda n,k,o=1: int(n>=o*k and k*subset_o(n-1,k,o) + comb(n-1,o-1)*subset_o(n-o,k-1,o) if k else n==0)) #oth-order (or o-associated) subset numbers
 
 harmonic=harm=lambda n,o=1: frac(smp(lambda i: frac(1,i)**o,range(1,n+1))) #put here in particular because (for k>=2) cycle(n,k)=smp(lambda i: harm(n-1,i+1)*(-1)**i*cycle(n,k+~i),range(k))//(k-1)
 
@@ -297,11 +325,6 @@ A058349=lambda k: smp(lambda i: smp(lambda d: comb(2*i,i+d)*d**(i+k-1)*(-1)**(k+
 A048174=lambda k: smp(lambda i: smp(lambda d: comb(2*i,i+d)*(d+1)**(i+k-1)*(-1)**(k+~d),range(-i,i+1))//fact(i),range(k)) #not conjectural :-)
 A392857=multA058349=lambda n,k: smp(lambda j: fact(2*j)//fact(j)*comb(n+j-1,k-1)*rsubset_int(-j,n-k,j),range(n-k+1))
 A058349=lambda n: multA058349(n,1)
-
-egfexp=lambda f: lambda n: fact(n)*smp(lambda p: frac(comb(len(p),*map(rgetitem(1),rle(p)))*prod(map(lambda k: frac(f(k),fact(k)),p)),fact(len(p))),accel_asc(n))
-faa=lambda f,g,egf=False: lambda n: smp(lambda p: frac(f(len(p)),fact(len(p)) if egf else 1)*prod(map(g,p))*(comb(n,*p) if egf else 1)*comb(len(p),*map(rgetitem(1),rle(p))),accel_asc(n)) #Faà di Bruno is so cool
-#A048172=lambda n: egfexp(A058349)(n)-(n==0)-A058349(n)
-A000262=egfexp(lambda n: n and fact(n))
 
 def accel_asc(n): #(thank you https://jeromekelleher.net/generating-integer-partitions.html ;-)
     if n:
