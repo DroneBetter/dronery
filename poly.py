@@ -309,7 +309,6 @@ class faa:
 
     if j:
       while s.gVal is None and len(s.ggg)<=n//(j+1): s._gcoef(len(s.ggg))
-    else: c=s._gcoef(n)
       r=s.gVal
       if r is None or n<(j+1)*r:
         c=0
@@ -317,13 +316,15 @@ class faa:
         lo,hi=j*r,n-r
         c=(b:=comb(n-1,lo))*s._gcoef(n-lo)*s.l[lo][j-1]+sum((b:=b*(n-k)//k)*s._gcoef(n-k)*s.l[k][j-1] for k in range(lo+1,hi+1))\
           if s.egf else sum(s._gcoef(n-k)*s.l[k][j-1] for k in range(lo,hi+1))
-
-    return row[j]:=c #updating row updates the cache
+    else:
+      c=s._gcoef(n)
+    row[j]=c
+    return c #updating row updates the cache
 
   def grow(s,n):
     s.fff.append(c:=s.ff(n))
     if c and not s.fVal: s.fVal=n
-    s.l.append(_faa_row(s,n))
+    s.l.append(s._faa_row(s,n))
     o=sum(s.fff[k]*s.l[n][k-1] for k in range(max(1,s.fVal),n+1) if s.fff[k]) if n else s.fff[0]
     s.out.append(o)
     return o
